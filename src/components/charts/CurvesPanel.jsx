@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Pause, Play, Download, Trash2, LineChart as LineIcon } from 'lucide-react'
+import { Pause, Play, Download, Trash2, LineChart as LineIcon, RotateCcw, Square } from 'lucide-react'
 import { useApp } from '../../state/AppContext.jsx'
 import { JointAnglesChart, SixDForceChart, GripperChart } from './CurveCards.jsx'
 
 export default function CurvesPanel({ onCSV }) {
-  const { paused, setPaused, exportRecordingCSV, clearRecordingBuffer, recordingState, recordingBufferSize } = useApp()
+  const { paused, setPaused, exportRecordingCSV, clearRecordingBuffer, recordingState, recordingBufferSize, startReplay, stopReplay } = useApp()
   const [bufferLen, setBufferLen] = useState(0)
   const [hidden, setHidden] = useState(false)
 
   // Poll buffer length while recording
   useEffect(() => {
-    if (recordingState !== 'recording') return
+    if (recordingState === 'replaying') return
     const t = setInterval(() => setBufferLen(recordingBufferSize()), 500)
     return () => clearInterval(t)
   }, [recordingState, recordingBufferSize])
@@ -32,8 +32,33 @@ export default function CurvesPanel({ onCSV }) {
               正在采集 ({bufferLen} 帧)
             </span>
           )}
+          {recordingState === 'replaying' && (
+            <span className="ml-2 flex items-center gap-1.5 text-[10px] text-success">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse-dot" />
+              本地回放中
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
+          {recordingState === 'replaying' ? (
+            <button
+              onClick={stopReplay}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-success hover:bg-success/10 transition-colors"
+            >
+              <Square size={12} />
+              停止回放
+            </button>
+          ) : (
+            <button
+              onClick={startReplay}
+              disabled={!bufferLen || recordingState === 'recording'}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="回放最新录制的数据"
+            >
+              <RotateCcw size={12} />
+              回放
+            </button>
+          )}
           <button
             onClick={() => setPaused((p) => !p)}
             className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"

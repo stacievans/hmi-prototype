@@ -342,7 +342,7 @@ export function AppProvider({ children }) {
   const [teleopMode, setTeleopMode] = useState('idle')     // idle | easing | follow
   const [inputSource, setInputSource] = useState(null)     // null | exoskeleton | vr
   const [easingProgress, setEasingProgress] = useState(0)
-  const [recordingState, setRecordingState] = useState('idle') // idle | recording
+  const [recordingState, setRecordingState] = useState('idle') // idle | recording | replaying
   const [recordingTime, setRecordingTime] = useState(0)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userName, setUserName] = useState('')
@@ -353,6 +353,7 @@ export function AppProvider({ children }) {
   const [history, setHistory] = useState([])
   const [paused, setPaused] = useState(false)
   const recordingBuffer = useRef([])   // samples saved while recording
+  const replayTimer = useRef(0)
 
   const startedAt = useRef(Date.now())
   const pingInterval = useRef(null)
@@ -379,9 +380,34 @@ export function AppProvider({ children }) {
 
   // Real-time data tick (30Hz). When paused, the curve freezes but the chart still draws.
   useEffect(() => {
-    if (paused) return
+    if (paused && recordingState !== 'replaying') return
     const interval = 1000 / SAMPLE_HZ
+
     const t = setInterval(() => {
+      if (recordingState === 'replaying') {
+        replayTimer.current += interval / 1000
+        const rt = replayTimer.current
+        const rows = recordingBuffer.current
+        if (rows.length === 0) {
+          setRecordingState('idle')
+          return
+        }
+        const targetT = rows[0].t + rt
+        const row = rows.find((r) => r.t >= targetT) || rows[rows.length - 1]
+
+        setLiveData({ joints: row.joints, force: row.force, gripper: row.gripper })
+        setHistory((prev) => {
+          const next = [...prev, { t: targetT * 1000, joints: row.joints, force: row.force, gripper: row.gripper }]
+          const cutoff = targetT * 1000 - HISTORY_WINDOW_MS
+          return next.length > 600 ? next.filter((s) => s.t >= cutoff) : next
+        })
+
+        if (rt >= rows[rows.length - 1].t - rows[0].t) {
+          setRecordingState('idle')
+        }
+        return
+      }
+
       const tSec = (Date.now() - startedAt.current) / 1000
       const sample = initialSample(tSec)
       setLiveData(sample)
@@ -398,6 +424,18 @@ export function AppProvider({ children }) {
     }, interval)
     return () => clearInterval(t)
   }, [paused, recordingState])
+
+  const startReplay = useCallback(() => {
+    if (recordingBuffer.current.length === 0) return
+    setRecordingState('replaying')
+    replayTimer.current = 0
+    setHistory([])
+  }, [])
+
+  const stopReplay = useCallback(() => {
+    setRecordingState('idle')
+    replayTimer.current = 0
+  }, [])
 
   const takeControl = useCallback(() => {
     if (!inputSource) return
@@ -489,6 +527,7 @@ export function AppProvider({ children }) {
     liveData, history, paused, setPaused,
     exportRecordingCSV, clearRecordingBuffer,
     recordingBufferSize: () => recordingBuffer.current.length,
+    startReplay, stopReplay,
     // Exposed definitions
     JOINT_KEYS, FORCE_KEYS, GRIPPER_KEYS,
   }
