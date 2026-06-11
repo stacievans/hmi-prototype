@@ -1,0 +1,106 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-size: 15px;
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --color-background: #0d1117;
+  --color-foreground: #e6edf3;
+  --color-card: #161b22;
+  --color-card-foreground: #e6edf3;
+  --color-popover: #1c2128;
+  --color-popover-foreground: #e6edf3;
+  --color-primary: #58a6ff;
+  --color-primary-foreground: #0d1117;
+  --color-secondary: #21262d;
+  --color-secondary-foreground: #c9d1d9;
+  --color-muted: #21262d;
+  --color-muted-foreground: #8b949e;
+  --color-accent: #1f6feb;
+  --color-accent-foreground: #ffffff;
+  --color-destructive: #f85149;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #f0f6fc1a;
+  --color-input: transparent;
+  --color-input-background: #0d1117;
+  --color-switch-background: #30363d;
+  --color-ring: #58a6ff;
+  --color-chart-1: #58a6ff;
+  --color-chart-2: #3fb950;
+  --color-chart-3: #d29922;
+  --color-chart-4: #f85149;
+  --color-chart-5: #bc8cff;
+
+  --color-success: #3fb950;
+  --color-warning: #d29922;
+  --color-danger: #f85149;
+
+  --radius: 0.5rem;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: "Inter", sans-serif;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+input {
+  font-family: inherit;
+  color: inherit;
+}
+
+input:focus {
+  outline: none;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+.animate-scan {
+  animation: scan 2.4s linear infinite;
+}
