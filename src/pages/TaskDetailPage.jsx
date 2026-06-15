@@ -1,13 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../state/AppContext.jsx'
-import { ArrowLeft, Archive, Send, Play, ArchiveRestore, LoaderCircle, Trash2, X, MonitorPlay, ChevronLeft, ChevronRight, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, Archive, Send, Play, ArchiveRestore, LoaderCircle, Trash2, MonitorPlay, ChevronLeft, ChevronRight, TriangleAlert } from 'lucide-react'
 
-const TABS = [
-  { key: 'all', label: '全部' },
-  { key: 'pending', label: '待采集' },
-  { key: 'completed', label: '已完成' },
-]
 const COMPRESS_OPTS = [
   { value: 'all', label: '全部压缩状态' },
   { value: 'pending', label: '待压缩' },
@@ -34,10 +29,9 @@ export default function TaskDetailPage() {
   const { tasks, setTasks } = useApp()
   const task = tasks.find((t) => t.id === taskId)
 
-  const [tab, setTab] = useState('all')
+  const [page, setPage] = useState(1)
   const [cFilter, setCFilter] = useState('all')
   const [uFilter, setUFilter] = useState('all')
-  const [page, setPage] = useState(1)
   const pageSize = 8
 
   const [progress, setProgress] = useState(null)   // { mode, idx, total, fileName }
@@ -121,13 +115,11 @@ export default function TaskDetailPage() {
   const filtered = useMemo(() => {
     if (!task) return []
     return task.items.filter((it) => {
-      if (tab === 'pending' && it.collectStatus === 'done') return false
-      if (tab === 'completed' && it.collectStatus !== 'done') return false
       if (cFilter !== 'all' && it.compressStatus !== cFilter) return false
       if (uFilter !== 'all' && it.uploadStatus !== uFilter) return false
       return true
     })
-  }, [task, tab, cFilter, uFilter])
+  }, [task, cFilter, uFilter])
 
   if (!task) {
     return <div className="flex-1 flex items-center justify-center text-muted-foreground">任务未找到</div>
@@ -136,11 +128,6 @@ export default function TaskDetailPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const list = filtered.slice((page - 1) * pageSize, page * pageSize)
   const pct = task.totalItems > 0 ? (task.completedItems / task.totalItems) * 100 : 0
-  const itemCounts = {
-    all: task.items.length,
-    pending: task.items.filter((it) => it.collectStatus === 'pending').length,
-    completed: task.items.filter((it) => it.collectStatus === 'done').length,
-  }
   const canSubmit = task.items.length > 0 && task.completedItems === task.totalItems
 
   return (
@@ -165,14 +152,6 @@ export default function TaskDetailPage() {
                 }`}>
                   {task.status === 'in_progress' ? '进行中' : task.status === 'completed' ? '已完成' : '待执行'}
                 </span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
-                <span>任务ID: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{task.taskId}</span></span>
-                <span>项目: {task.project}</span>
-                <span>场景: {task.scene}</span>
-                <span>采集方式: {task.collectionMethod}</span>
-                <span>用途: {task.purpose}</span>
               </div>
             </div>
             {task.status === 'in_progress' ? (
@@ -262,49 +241,26 @@ export default function TaskDetailPage() {
           </div>
         </div>
 
-        <div className="px-6 py-3 border-b border-border shrink-0 flex items-center gap-3 flex-wrap text-xs">
-          {TABS.map((t) => {
-            const active = tab === t.key
-            return (
-              <button
-                key={t.key}
-                onClick={() => { setTab(t.key); setPage(1) }}
-                className={`relative px-3 py-1.5 text-sm font-medium transition-colors
-                  ${active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-              >
-                {t.label} ({itemCounts[t.key]})
-                {active && <span className="absolute left-0 right-0 -bottom-3 h-0.5 bg-primary rounded-full" />}
-              </button>
-            )
-          })}
-          <div className="ml-auto flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <span>压缩:</span>
-              <select
-                value={cFilter}
-                onChange={(e) => { setCFilter(e.target.value); setPage(1) }}
-                className="bg-secondary border border-border text-foreground text-xs rounded px-2 py-1 focus:border-primary focus:outline-none"
-              >
-                {COMPRESS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <span>上传:</span>
-              <select
-                value={uFilter}
-                onChange={(e) => { setUFilter(e.target.value); setPage(1) }}
-                className="bg-secondary border border-border text-foreground text-xs rounded px-2 py-1 focus:border-primary focus:outline-none"
-              >
-                {UPLOAD_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <button
-                onClick={() => { setCFilter('all'); setUFilter('all') }}
-                className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X size={12} />
-                清除筛选
-              </button>
+        <div className="px-6 py-3 border-b border-border shrink-0 flex items-center gap-3 justify-end text-xs">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <span>压缩:</span>
+            <select
+              value={cFilter}
+              onChange={(e) => { setCFilter(e.target.value); setPage(1) }}
+              className="bg-secondary border border-border text-foreground text-xs rounded px-2 py-1 focus:border-primary focus:outline-none"
+            >
+              {COMPRESS_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <span>上传:</span>
+            <select
+              value={uFilter}
+              onChange={(e) => { setUFilter(e.target.value); setPage(1) }}
+              className="bg-secondary border border-border text-foreground text-xs rounded px-2 py-1 focus:border-primary focus:outline-none"
+            >
+              {UPLOAD_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
           </div>
         </div>
 

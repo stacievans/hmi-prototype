@@ -14,7 +14,7 @@ export default function SettingsPage() {
       <section className="p-4 rounded-xl bg-card border border-border">
         <div className="flex items-center gap-2 mb-4">
           <Info size={18} className="text-primary" />
-          <h3>系统版本与关于</h3>
+          <h3>系统版本信息</h3>
         </div>
         <div className="grid grid-cols-2 gap-4 text-sm">
           {ITEMS.map((it) => (
