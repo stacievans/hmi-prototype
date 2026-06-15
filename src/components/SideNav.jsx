@@ -10,31 +10,33 @@ const NAV = [
 export default function SideNav({ currentPath, onNavigate }) {
   const isActive = (p) => p === '/' ? currentPath === '/' : currentPath.startsWith(p)
   return (
-    <nav className="flex flex-col items-center w-16 min-w-16 bg-[#010409] border-r border-border py-4 gap-2 z-50">
-      <div className="mb-4 w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center shadow-[0_0_20px_rgba(88,166,255,0.25)]">
-        <span className="text-primary" style={{ fontSize: 18, fontWeight: 700 }}>H</span>
+    <nav className="flex flex-col w-[200px] min-w-[200px] bg-[#010409] border-r border-border py-6 z-50">
+      <div className="mb-8 px-6 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center shadow-[0_0_20px_rgba(88,166,255,0.25)] shrink-0">
+          <span className="text-primary" style={{ fontSize: 16, fontWeight: 700 }}>H</span>
+        </div>
+        <span className="text-sm font-semibold tracking-wide text-foreground">Web HMI</span>
       </div>
-      {NAV.map((n) => {
-        const Icon = n.icon
-        const active = isActive(n.path)
-        return (
-          <div key={n.key} className="relative group">
+      <div className="flex flex-col gap-1.5 px-3">
+        {NAV.map((n) => {
+          const Icon = n.icon
+          const active = isActive(n.path)
+          return (
             <button
+              key={n.key}
               onClick={() => onNavigate(n.path)}
-              className={`w-11 h-11 flex items-center justify-center rounded-lg transition-all
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm font-medium
                 ${active
-                  ? 'bg-primary/20 text-primary shadow-[0_0_12px_rgba(88,166,255,0.18)]'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary'}`}
+                  ? 'bg-primary/15 text-primary shadow-[inset_2px_0_0_rgba(88,166,255,1)]'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'}`}
               aria-label={n.label}
             >
-              <Icon size={20} />
-            </button>
-            <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-popover text-popover-foreground rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg border border-border">
+              <Icon size={18} className={active ? "opacity-100" : "opacity-70"} />
               {n.label}
-            </div>
-          </div>
-        )
-      })}
+            </button>
+          )
+        })}
+      </div>
     </nav>
   )
 }
