@@ -180,7 +180,7 @@ export default function TaskDetailPage() {
                 <button
                   onClick={startCompress}
                   disabled={!!progress}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 transition-colors disabled:opacity-50 text-sm"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
                 >
                   <Archive size={14} />
                   批量压缩
@@ -188,21 +188,21 @@ export default function TaskDetailPage() {
                 <button
                   onClick={startUpload}
                   disabled={!!progress}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 transition-colors disabled:opacity-50 text-sm"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
                 >
                   <Send size={14} />
                   批量上传
                 </button>
                 <button
                   onClick={() => setConfirmStart(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
                 >
                   <Play size={14} />
                   继续采集
                 </button>
                 <button
                   onClick={() => setSubmitModal(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-success text-white hover:bg-success/90 transition-colors text-sm"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-success text-white hover:bg-success/90 transition-colors active:scale-[0.98] text-sm font-medium"
                 >
                   <ArchiveRestore size={14} />
                   提交任务
@@ -213,7 +213,7 @@ export default function TaskDetailPage() {
                 <button
                   onClick={startCompress}
                   disabled={!!progress}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors disabled:opacity-50 text-sm"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
                 >
                   <Archive size={14} />
                   批量压缩
@@ -221,14 +221,14 @@ export default function TaskDetailPage() {
                 <button
                   onClick={startUpload}
                   disabled={!!progress}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors disabled:opacity-50 text-sm"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
                 >
                   <Send size={14} />
                   批量上传
                 </button>
                 <button
                   onClick={() => nav(`/collection/workstation/${taskId}`)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors text-sm"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
                 >
                   <MonitorPlay size={14} />
                   打开工作站
@@ -236,7 +236,7 @@ export default function TaskDetailPage() {
                 <button
                   onClick={() => setConfirmStart(true)}
                   disabled={task.completedItems >= task.totalItems}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 text-sm"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-40 text-sm font-medium"
                 >
                   <Play size={14} />
                   {task.completedItems > 0 ? '继续采集' : '开始采集'}
@@ -244,7 +244,7 @@ export default function TaskDetailPage() {
                 <button
                   onClick={() => setSubmitModal(true)}
                   disabled={!canSubmit || task.status === 'completed'}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-success text-white hover:bg-success/90 transition-colors disabled:opacity-40 text-sm"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-success text-white hover:bg-success/90 transition-colors active:scale-[0.98] disabled:opacity-40 text-sm font-medium"
                 >
                   <ArchiveRestore size={14} />
                   {task.status === 'completed' ? '已提交' : '提交任务'}
@@ -263,16 +263,20 @@ export default function TaskDetailPage() {
         </div>
 
         <div className="px-6 py-3 border-b border-border shrink-0 flex items-center gap-3 flex-wrap text-xs">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => { setTab(t.key); setPage(1) }}
-              className={`px-3 py-1 rounded-full transition-colors
-                ${tab === t.key ? 'bg-primary/20 text-primary' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
-            >
-              {t.label} ({itemCounts[t.key]})
-            </button>
-          ))}
+          {TABS.map((t) => {
+            const active = tab === t.key
+            return (
+              <button
+                key={t.key}
+                onClick={() => { setTab(t.key); setPage(1) }}
+                className={`relative px-3 py-1.5 text-sm font-medium transition-colors
+                  ${active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {t.label} ({itemCounts[t.key]})
+                {active && <span className="absolute left-0 right-0 -bottom-3 h-0.5 bg-primary rounded-full" />}
+              </button>
+            )
+          })}
           <div className="ml-auto flex items-center gap-3">
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <span>压缩:</span>

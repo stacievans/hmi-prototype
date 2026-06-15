@@ -73,18 +73,20 @@ export default function CollectionPage() {
           <>
             <div className="flex items-center gap-2 px-6 py-3 shrink-0 flex-wrap">
               <Filter size={14} className="text-muted-foreground" />
-              {TABS.map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => { setTab(t.key); setPage(1) }}
-                  className={`px-3 py-1 rounded-full text-xs transition-colors
-                    ${tab === t.key
-                      ? 'bg-primary/20 text-primary'
-                      : 'bg-secondary text-muted-foreground hover:text-foreground'}`}
-                >
-                  {t.label}
-                </button>
-              ))}
+              {TABS.map((t) => {
+                const active = tab === t.key
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => { setTab(t.key); setPage(1) }}
+                    className={`relative px-3 py-1.5 text-sm font-medium transition-colors
+                      ${active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    {t.label}
+                    {active && <span className="absolute left-2 right-2 -bottom-3 h-0.5 bg-primary rounded-full" />}
+                  </button>
+                )
+              })}
               <div className="ml-auto flex items-center gap-1.5 w-64">
                 <Search size={14} className="text-muted-foreground shrink-0" />
                 <input
@@ -164,20 +166,14 @@ export default function CollectionPage() {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-center max-w-sm">
-              <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <LogIn size={36} className="text-primary" />
-              </div>
-              <h3 className="mb-2">请先登录云平台</h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                请先登录云平台以查看采集任务
-              </p>
+            <div className="text-center">
+              <h3 className="text-base text-foreground mb-6">请先登录云平台以查看采集任务</h3>
               <button
                 onClick={() => setShowLogin(true)}
-                className="px-6 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors inline-flex items-center gap-2"
+                className="px-6 py-2.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-colors font-medium inline-flex items-center gap-2"
               >
-                <LogIn size={14} />
-                登录云平台
+                <LogIn size={16} />
+                登录
               </button>
             </div>
           </div>
@@ -216,11 +212,10 @@ export default function CollectionPage() {
               </div>
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="w-full py-2.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] font-medium"
               >
                 登录
               </button>
-              <p className="text-xs text-muted-foreground text-center">测试环境，输入任意用户名即可登录</p>
             </form>
           </div>
         </>

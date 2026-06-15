@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout.jsx'
-import ConnectPage from './pages/ConnectPage.jsx'
 import TeleopPage from './pages/TeleopPage.jsx'
 import CollectionPage from './pages/CollectionPage.jsx'
 import TaskDetailPage from './pages/TaskDetailPage.jsx'
@@ -12,14 +11,14 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
-        <Route index element={<ConnectPage />} />
+        <Route index element={<Navigate to="/teleop" replace />} />
         <Route path="teleop" element={<TeleopPage />} />
         <Route path="collection" element={<CollectionPage />} />
         <Route path="collection/task/:taskId" element={<TaskDetailPage />} />
         <Route path="collection/workstation/:taskId" element={<WorkstationPage />} />
         <Route path="devices" element={<DevicesPage />} />
         <Route path="settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/teleop" replace />} />
       </Route>
     </Routes>
   )
