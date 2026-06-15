@@ -1,10 +1,12 @@
-import { Joystick, ClipboardList, Cpu, Settings } from 'lucide-react'
+import { Joystick, ClipboardList, Cpu, Plug, Settings as SettingsIcon } from 'lucide-react'
+import logoUrl from '../assets/智平方logo.svg'
 
 const NAV = [
-  { path: '/', icon: Joystick, label: '遥操', key: 'teleop' },
+  { path: '/', icon: Plug, label: '连接', key: 'connect' },
+  { path: '/teleop', icon: Joystick, label: '遥操', key: 'teleop' },
   { path: '/collection', icon: ClipboardList, label: '采集', key: 'collection' },
   { path: '/devices', icon: Cpu, label: '设备', key: 'devices' },
-  { path: '/settings', icon: Settings, label: '设置', key: 'settings' },
+  { path: '/settings', icon: SettingsIcon, label: '设置', key: 'settings' },
 ]
 
 export default function SideNav({ currentPath, onNavigate }) {
@@ -12,10 +14,10 @@ export default function SideNav({ currentPath, onNavigate }) {
   return (
     <nav className="flex flex-col w-[200px] min-w-[200px] bg-[#010409] border-r border-border py-6 z-50">
       <div className="mb-8 px-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center shadow-[0_0_20px_rgba(88,166,255,0.25)] shrink-0">
-          <span className="text-primary" style={{ fontSize: 16, fontWeight: 700 }}>H</span>
+        <div className="w-8 h-8 rounded-lg bg-card flex items-center justify-center shrink-0 p-1">
+          <img src={logoUrl} alt="智平方" className="w-full h-full object-contain" />
         </div>
-        <span className="text-sm font-semibold tracking-wide text-foreground">Web HMI</span>
+        <span className="text-sm font-semibold tracking-wide text-foreground">HMI</span>
       </div>
       <div className="flex flex-col gap-1.5 px-3">
         {NAV.map((n) => {
