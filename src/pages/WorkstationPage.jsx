@@ -326,7 +326,13 @@ export default function WorkstationPage() {
             {/* Collection timer */}
             <div className="p-3 border-b border-border">
               <h4 className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider">采集计时</h4>
-              <div className="text-3xl text-center text-foreground my-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{formatTime(elapsed)}</div>
+              <div
+                className={`text-3xl text-center my-2 ${recordingState === 'recording' ? 'text-destructive' : 'text-foreground'}`}
+                style={{ fontFamily: "'JetBrains Mono', monospace" }}
+              >
+                {formatTime(elapsed)}
+              </div>
+              <div className="text-[10px] text-warning text-center mb-3">最短采集时长 {MIN_DURATION}s</div>
               {recordingState === 'recording' && elapsed > 0 && elapsed < MAX_DURATION && elapsed >= MAX_DURATION - 30 && (
                 <div className="text-[10px] text-warning text-center mt-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   即将达到最大时长 {Math.floor(MAX_DURATION / 60)} 分钟
@@ -341,16 +347,16 @@ export default function WorkstationPage() {
                   开始采集 (R)
                 </button>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
                   <button
                     onClick={stopRecord}
-                    className="py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium shadow-sm"
+                    className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium shadow-sm"
                   >
                     结束采集 (S)
                   </button>
                   <button
                     onClick={() => setShowCancelConfirm(true)}
-                    className="py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium border border-border"
+                    className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium border border-border"
                   >
                     取消采集 (Esc)
                   </button>
@@ -367,23 +373,27 @@ export default function WorkstationPage() {
                     <button
                       key={key}
                       onClick={() => setInputSource(key)}
-                      className={`flex flex-col items-center gap-1.5 p-2.5 rounded-md border transition-all relative ${
+                      className={`flex items-center justify-center gap-2 p-2.5 rounded-md border transition-all relative ${
                         inputSource === key
                           ? 'border-primary bg-primary/10 text-primary'
                           : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
                       }`}
                     >
-                      <Icon size={18} />
-                      <span className="text-[11px]">{label}</span>
-                      <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${connected ? 'bg-success' : 'bg-danger'}`} />
+                      <Icon size={14} />
+                      <span className="text-xs">{label}</span>
+                      <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${connected ? 'bg-success' : 'bg-destructive'}`} />
                     </button>
                   ))}
                 </div>
                 {inputSource && (
-                  <div className={`text-[10px] mt-2 flex items-center gap-1 ${(inputSource === 'exoskeleton' ? cd.exoskeleton : cd.vr) ? 'text-success' : 'text-danger'}`}>
+                  <div className={`text-[11px] mt-2 flex items-center gap-1.5 px-2 py-1 rounded ${
+                    (inputSource === 'exoskeleton' ? cd.exoskeleton : cd.vr)
+                      ? 'bg-success/10 text-success'
+                      : 'bg-destructive/10 text-destructive'
+                  }`}>
                     {(inputSource === 'exoskeleton' ? cd.exoskeleton : cd.vr)
-                      ? <><Check size={10} /> {inputSource === 'exoskeleton' ? '外骨骼' : 'VR'} 连接成功</>
-                      : <><TriangleAlert size={10} /> {inputSource === 'exoskeleton' ? '外骨骼' : 'VR'} 未连接</>}
+                      ? <><Check size={11} /> {inputSource === 'exoskeleton' ? '外骨骼' : 'VR'} 连接成功</>
+                      : <><TriangleAlert size={11} /> {inputSource === 'exoskeleton' ? '外骨骼' : 'VR'} 未连接</>}
                   </div>
                 )}
               </div>
@@ -400,19 +410,16 @@ export default function WorkstationPage() {
                   </button>
                 ) : (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-muted-foreground">运动模式</span>
-                      <span className="text-warning">{teleopMode === 'easing' ? '缓动对齐' : '随动'}</span>
-                    </div>
                     {inputSource === 'exoskeleton' && teleopMode === 'easing' && (
-                      <div className="w-full h-1.5 rounded-full bg-secondary overflow-hidden">
-                        <div className="h-full bg-warning rounded-full transition-all" style={{ width: `${easingProgress}%` }} />
-                      </div>
-                    )}
-                    {((inputSource === 'exoskeleton' && teleopMode === 'follow') || inputSource === 'vr') && (
-                      <div className="text-success text-[10px] flex items-center gap-1.5">
-                        <Check size={11} /> 实时映射中
-                      </div>
+                      <>
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-muted-foreground">缓动对齐</span>
+                          <span className="text-warning tabular-nums">{easingProgress.toFixed(0)}%</span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-secondary overflow-hidden">
+                          <div className="h-full bg-warning rounded-full transition-all" style={{ width: `${easingProgress}%` }} />
+                        </div>
+                      </>
                     )}
                     <button
                       onClick={releaseControl}
@@ -420,6 +427,11 @@ export default function WorkstationPage() {
                     >
                       退出控制
                     </button>
+                    {((inputSource === 'exoskeleton' && teleopMode === 'follow') || inputSource === 'vr') && (
+                      <div className="text-[11px] flex items-center gap-1.5 px-2 py-1 rounded bg-success/10 text-success">
+                        <Check size={11} /> 随动模式 · 实时映射中
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -575,7 +587,8 @@ function CameraTile({ cam, recording, large = false }) {
 }
 
 function formatTime(s) {
-  const m = Math.floor(s / 60).toString().padStart(2, '0')
+  const h = Math.floor(s / 3600).toString().padStart(2, '0')
+  const m = Math.floor((s % 3600) / 60).toString().padStart(2, '0')
   const ss = (s % 60).toString().padStart(2, '0')
-  return `${m}:${ss}`
+  return `${h}:${m}:${ss}`
 }
