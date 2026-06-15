@@ -102,13 +102,13 @@ export default function DevicesPage() {
             <div className="flex gap-2.5 justify-end">
               <button
                 onClick={() => setConfirmId(null)}
-                className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
+                className="px-5 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
               >
                 取消
               </button>
               <button
                 onClick={confirmStart}
-                className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
+                className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
               >
                 确认启动
               </button>
@@ -126,7 +126,7 @@ function PowerButton({ status, onClick }) {
     return (
       <button
         disabled
-        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-warning/15 text-warning border border-warning/30 text-xs font-medium cursor-wait"
+        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-warning/15 text-warning border border-warning/30 text-xs font-medium cursor-wait"
       >
         <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse-dot" />
         启动中…
@@ -137,7 +137,7 @@ function PowerButton({ status, onClick }) {
     return (
       <button
         onClick={onClick}
-        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] text-xs font-medium shadow-sm"
+        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] text-xs font-medium shadow-sm"
       >
         <Power size={13} strokeWidth={2.5} />
         停止
@@ -147,7 +147,7 @@ function PowerButton({ status, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-success text-white hover:bg-success/90 transition-colors active:scale-[0.98] text-xs font-medium shadow-sm"
+      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success text-white hover:bg-success/90 transition-colors active:scale-[0.98] text-xs font-medium shadow-sm"
     >
       <Power size={13} strokeWidth={2.5} />
       启动

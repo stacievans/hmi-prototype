@@ -57,11 +57,11 @@ export default function CameraGrid() {
         <div className="w-full h-full relative">
           <CameraTile label={fsCam.label} large />
           <button
-            onClick={() => setFullscreenId(null)}
-            className="absolute bottom-3 right-3 z-10 px-3 py-1.5 rounded bg-secondary/80 text-foreground text-xs hover:bg-secondary transition-colors"
-          >
-            退出全屏
-          </button>
+              onClick={onExitFullscreen}
+              className="absolute bottom-3 right-3 z-10 px-3 py-1.5 rounded-xl bg-secondary/80 text-foreground text-xs hover:bg-secondary transition-colors border border-border"
+            >
+              退出全屏
+            </button>
         </div>
       ) : (
         <div className={`w-full h-full grid gap-1 p-1 ${enabled.length <= 1 ? 'grid-cols-1' : enabled.length <= 2 ? 'grid-cols-2' : 'grid-cols-2 grid-rows-2'}`}>

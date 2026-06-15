@@ -83,7 +83,7 @@ export default function GripperTimeDock() {
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground uppercase tracking-wider">夹爪 · 左/右末端</span>
           <span className="text-[10px] text-muted-foreground/60" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            open [-1, 1] · force [N]
+            open [0, 1] · force [N]
           </span>
           {recordingState === 'recording' && (
             <span className="text-[10px] text-destructive flex items-center gap-1">
@@ -95,7 +95,7 @@ export default function GripperTimeDock() {
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setPaused((p) => !p)}
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors font-medium"
             title={paused ? '继续' : '暂停'}
           >
             {paused ? <Play size={11} /> : <Pause size={11} />}
@@ -104,7 +104,7 @@ export default function GripperTimeDock() {
           <button
             onClick={() => setScrubSec(0)}
             disabled={maxScrubSec === 0}
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-medium"
             title="回到最新"
           >
             <RotateCcw size={11} />

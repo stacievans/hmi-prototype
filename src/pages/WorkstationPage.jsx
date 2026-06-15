@@ -202,7 +202,7 @@ export default function WorkstationPage() {
         <div className="flex items-center justify-between shrink-0 px-1">
           <button
             onClick={handleBack}
-            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors rounded-md px-2 py-1 -ml-2 hover:bg-secondary"
+            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors rounded-md px-2.5 py-1 -ml-2 hover:bg-secondary"
           >
             <ArrowLeft size={16} />
             返回
@@ -335,22 +335,22 @@ export default function WorkstationPage() {
               {recordingState !== 'recording' ? (
                 <button
                   onClick={handleRecordClick}
-                  className="w-full py-2.5 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-2 text-sm font-medium shadow-sm"
+                  className="w-full py-3 rounded-2xl bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-2 text-sm font-medium shadow-md"
                 >
-                  <Circle size={10} className="fill-white" />
+                  <Circle size={11} className="fill-white" strokeWidth={0} />
                   开始采集 (R)
                 </button>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={stopRecord}
-                    className="py-2.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-1 text-xs font-medium"
+                    className="py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium shadow-sm"
                   >
                     结束采集 (S)
                   </button>
                   <button
                     onClick={() => setShowCancelConfirm(true)}
-                    className="py-2.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] flex items-center justify-center gap-1 text-xs font-medium border border-border"
+                    className="py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium border border-border"
                   >
                     取消采集 (Esc)
                   </button>
@@ -393,9 +393,10 @@ export default function WorkstationPage() {
                   <button
                     onClick={takeControl}
                     disabled={!inputSource}
-                    className="w-full py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-xs font-medium"
+                    className="w-full py-3 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium shadow-md"
                   >
-                    <Play size={12} /> 开启控制
+                    <Play size={14} fill="currentColor" />
+                    开启控制
                   </button>
                 ) : (
                   <div className="space-y-2">
@@ -411,9 +412,9 @@ export default function WorkstationPage() {
                         <button
                           onClick={switchToFollow}
                           disabled={easingProgress < 100}
-                          className="w-full py-1.5 rounded-md border border-primary text-primary hover:bg-primary/10 transition-colors active:scale-[0.98] disabled:opacity-30 text-xs flex items-center justify-center gap-1 font-medium"
+                          className="w-full py-2.5 rounded-xl border border-primary text-primary hover:bg-primary/10 transition-colors active:scale-[0.98] disabled:opacity-30 text-xs flex items-center justify-center gap-1.5 font-medium"
                         >
-                          <ArrowRightLeft size={11} /> 切换随动
+                          <ArrowRightLeft size={12} /> 切换随动
                         </button>
                       </>
                     )}
@@ -424,7 +425,7 @@ export default function WorkstationPage() {
                     )}
                     <button
                       onClick={releaseControl}
-                      className="w-full py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-xs font-medium border border-border"
+                      className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-xs font-medium border border-border"
                     >
                       退出控制
                     </button>
@@ -461,13 +462,13 @@ export default function WorkstationPage() {
             <div className="flex gap-2.5 justify-end">
               <button
                 onClick={() => doStop(true)}
-                className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
+                className="px-5 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
               >
                 丢弃
               </button>
               <button
                 onClick={() => setShowWarnShort(false)}
-                className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
+                className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
               >
                 继续录制
               </button>
@@ -488,7 +489,7 @@ export default function WorkstationPage() {
             <div className="flex gap-2.5 justify-end">
               <button
                 onClick={() => doStop()}
-                className="px-4 py-2 rounded-md bg-warning text-warning-foreground hover:bg-warning/90 transition-colors active:scale-[0.98] text-sm font-medium"
+                className="px-5 py-2.5 rounded-xl bg-warning text-warning-foreground hover:bg-warning/90 transition-colors active:scale-[0.98] text-sm font-medium"
               >
                 强制结束
               </button>
@@ -508,13 +509,13 @@ export default function WorkstationPage() {
             <div className="flex gap-2.5 justify-end">
               <button
                 onClick={() => { setShowCancelConfirm(false); setCancelCountdown(3) }}
-                className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
+                className="px-5 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
               >
                 继续录制
               </button>
               <button
                 onClick={() => { doStop(true); setShowCancelConfirm(false); setCancelCountdown(3) }}
-                className="px-4 py-2 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] text-sm font-medium"
+                className="px-5 py-2.5 rounded-xl bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] text-sm font-medium"
               >
                 确认取消 ({cancelCountdown})
               </button>
@@ -536,13 +537,13 @@ export default function WorkstationPage() {
             <div className="flex gap-2.5 justify-end">
               <button
                 onClick={() => setShowLeaveConfirm(false)}
-                className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
+                className="px-5 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
               >
                 取消
               </button>
               <button
                 onClick={confirmLeave}
-                className="px-4 py-2 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] text-sm font-medium"
+                className="px-5 py-2.5 rounded-xl bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] text-sm font-medium"
               >
                 确认离开
               </button>

@@ -19,13 +19,13 @@ export default function LeaveConfirmModal({ mode, onCancel, onConfirm }) {
         <div className="flex gap-2.5 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border"
+            className="px-5 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border"
           >
             取消
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded-md bg-destructive text-white hover:bg-destructive/90 active:scale-[0.98] transition-colors text-sm font-medium"
+            className="px-5 py-2.5 rounded-xl bg-destructive text-white hover:bg-destructive/90 active:scale-[0.98] transition-colors text-sm font-medium"
           >
             确认离开
           </button>

@@ -43,7 +43,7 @@ export default function CurvesPanel({ onCSV }) {
           {recordingState === 'replaying' ? (
             <button
               onClick={stopReplay}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-success hover:bg-success/10 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-success hover:bg-success/10 transition-colors font-medium"
             >
               <Square size={12} />
               停止回放
@@ -52,7 +52,7 @@ export default function CurvesPanel({ onCSV }) {
             <button
               onClick={startReplay}
               disabled={!bufferLen || recordingState === 'recording'}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-medium"
               title="回放最新录制的数据"
             >
               <RotateCcw size={12} />
@@ -61,7 +61,7 @@ export default function CurvesPanel({ onCSV }) {
           )}
           <button
             onClick={() => setPaused((p) => !p)}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors font-medium"
             title={paused ? '继续' : '暂停'}
           >
             {paused ? <Play size={12} /> : <Pause size={12} />}
@@ -70,7 +70,7 @@ export default function CurvesPanel({ onCSV }) {
           <button
             onClick={handleExport}
             disabled={!bufferLen && recordingState !== 'recording'}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-medium"
             title="导出本次录制 CSV"
           >
             <Download size={12} />
@@ -78,7 +78,7 @@ export default function CurvesPanel({ onCSV }) {
           </button>
           <button
             onClick={() => { clearRecordingBuffer(); setBufferLen(0) }}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors font-medium"
             title="清空录制缓冲"
           >
             <Trash2 size={12} />
@@ -86,7 +86,7 @@ export default function CurvesPanel({ onCSV }) {
           </button>
           <button
             onClick={() => setHidden((h) => !h)}
-            className="px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors font-medium"
           >
             {hidden ? '展开' : '收起'}
           </button>

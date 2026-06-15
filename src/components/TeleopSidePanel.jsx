@@ -73,15 +73,15 @@ export default function TeleopSidePanel() {
           <button
             onClick={takeControl}
             disabled={!inputSource}
-            className="w-full py-2.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium shadow-sm"
+            className="w-full py-3 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium shadow-md"
           >
-            <Play size={16} />
+            <Play size={14} fill="currentColor" />
             开启控制
           </button>
         ) : (
           <button
             onClick={releaseControl}
-            className="w-full py-2.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] flex items-center justify-center gap-2 text-sm font-medium border border-border"
+            className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] flex items-center justify-center gap-2 text-xs font-medium border border-border"
           >
             退出控制
           </button>
@@ -110,7 +110,7 @@ export default function TeleopSidePanel() {
               <button
                 onClick={switchToFollow}
                 disabled={easingProgress < 100}
-                className="w-full py-2.5 rounded-md border border-primary text-primary hover:bg-primary/10 transition-colors active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium"
+                className="w-full py-2.5 rounded-xl border border-primary text-primary hover:bg-primary/10 transition-colors active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium"
               >
                 <ArrowRightLeft size={14} />
                 切换随动模式

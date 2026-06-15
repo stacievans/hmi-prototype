@@ -159,7 +159,7 @@ export default function TaskDetailPage() {
                 <button
                   onClick={startCompress}
                   disabled={!!progress}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
                 >
                   <Archive size={14} />
                   批量压缩
@@ -167,21 +167,21 @@ export default function TaskDetailPage() {
                 <button
                   onClick={startUpload}
                   disabled={!!progress}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
                 >
                   <Send size={14} />
                   批量上传
                 </button>
                 <button
                   onClick={() => setConfirmStart(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
                 >
-                  <Play size={14} />
+                  <Play size={14} fill="currentColor" />
                   继续采集
                 </button>
                 <button
                   onClick={() => setSubmitModal(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-success text-white hover:bg-success/90 transition-colors active:scale-[0.98] text-sm font-medium"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success text-white hover:bg-success/90 transition-colors active:scale-[0.98] text-sm font-medium"
                 >
                   <ArchiveRestore size={14} />
                   提交任务
@@ -192,7 +192,7 @@ export default function TaskDetailPage() {
                 <button
                   onClick={startCompress}
                   disabled={!!progress}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
                 >
                   <Archive size={14} />
                   批量压缩
@@ -200,14 +200,14 @@ export default function TaskDetailPage() {
                 <button
                   onClick={startUpload}
                   disabled={!!progress}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
                 >
                   <Send size={14} />
                   批量上传
                 </button>
                 <button
                   onClick={() => nav(`/collection/workstation/${taskId}`)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
                 >
                   <MonitorPlay size={14} />
                   打开工作站
@@ -215,15 +215,15 @@ export default function TaskDetailPage() {
                 <button
                   onClick={() => setConfirmStart(true)}
                   disabled={task.completedItems >= task.totalItems}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-40 text-sm font-medium"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-40 text-sm font-medium"
                 >
-                  <Play size={14} />
+                  <Play size={14} fill="currentColor" />
                   {task.completedItems > 0 ? '继续采集' : '开始采集'}
                 </button>
                 <button
                   onClick={() => setSubmitModal(true)}
                   disabled={!canSubmit || task.status === 'completed'}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-success text-white hover:bg-success/90 transition-colors active:scale-[0.98] disabled:opacity-40 text-sm font-medium"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success text-white hover:bg-success/90 transition-colors active:scale-[0.98] disabled:opacity-40 text-sm font-medium"
                 >
                   <ArchiveRestore size={14} />
                   {task.status === 'completed' ? '已提交' : '提交任务'}
@@ -324,14 +324,14 @@ export default function TaskDetailPage() {
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium border border-border"
+                    className="px-3 py-1.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium border border-border"
                   >
                     <ChevronLeft size={14} /> 上一页
                   </button>
                   <button
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium border border-border"
+                    className="px-3 py-1.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium border border-border"
                   >
                     下一页 <ChevronRight size={14} />
                   </button>
@@ -371,8 +371,8 @@ export default function TaskDetailPage() {
             <h3 className="mb-3">打开工作站</h3>
             <p className="text-sm text-muted-foreground mb-6">即将进入工作站准备本次采集，是否继续？</p>
             <div className="flex gap-2.5 justify-end">
-              <button onClick={() => setConfirmStart(false)} className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">取消</button>
-              <button onClick={startCollect} className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-colors text-sm font-medium">确认</button>
+              <button onClick={() => setConfirmStart(false)} className="px-5 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">取消</button>
+              <button onClick={startCollect} className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-colors text-sm font-medium">确认</button>
             </div>
           </div>
         </div>
@@ -448,11 +448,11 @@ export default function TaskDetailPage() {
               <div className="flex gap-2.5 justify-end">
                 {canSubmitNow ? (
                   <>
-                    <button onClick={() => setSubmitModal(false)} className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">取消</button>
-                    <button onClick={submitTask} className="px-4 py-2 rounded-md bg-success text-white hover:bg-success/90 active:scale-[0.98] transition-colors text-sm font-medium">确认提交任务</button>
+                    <button onClick={() => setSubmitModal(false)} className="px-5 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">取消</button>
+                    <button onClick={submitTask} className="px-5 py-2.5 rounded-xl bg-success text-white hover:bg-success/90 active:scale-[0.98] transition-colors text-sm font-medium">确认提交任务</button>
                   </>
                 ) : (
-                  <button onClick={() => setSubmitModal(false)} className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">知道了</button>
+                  <button onClick={() => setSubmitModal(false)} className="px-5 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">知道了</button>
                 )}
               </div>
             </div>
@@ -467,8 +467,8 @@ export default function TaskDetailPage() {
             <h3 className="mb-3 text-destructive">删除文件</h3>
             <p className="text-sm text-muted-foreground mb-6">确认删除该采集文件？此操作不可恢复。</p>
             <div className="flex gap-2.5 justify-end">
-              <button onClick={() => setDeleteItemId(null)} className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">取消</button>
-              <button onClick={deleteItem} className="px-4 py-2 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-[0.98] transition-colors text-sm font-medium">确认删除</button>
+              <button onClick={() => setDeleteItemId(null)} className="px-5 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">取消</button>
+              <button onClick={deleteItem} className="px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-[0.98] transition-colors text-sm font-medium">确认删除</button>
             </div>
           </div>
         </div>

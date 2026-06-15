@@ -561,14 +561,26 @@ function initialSample(tSec = 0) {
     const drift = Math.sin(2 * Math.PI * 0.3 * tSec + f.key.charCodeAt(0)) * forceAmp[f.key] * 0.3
     force[f.key] = +(forceAmp[f.key] * 0.4 + drift + noise).toFixed(2)
   }
-  // Gripper: openness -1..1, stroke 20..80mm, force correlates with closing
-  const closing = Math.sin(2 * Math.PI * 0.35 * tSec)  // -1..1
-  const stroke = 50 + 30 * closing
-  const forceN  = Math.max(0, 12 + 10 * closing + (Math.random() - 0.5) * 1.5)
+  // Gripper: openness 0..1 as a step (square wave, quantised) — corresponds
+  // to a gripper commanded in discrete positions.  force correlates
+  // non-linearly with openness: smaller openness (closed) → large force,
+  // large openness (open) → force decays non-linearly.
+  const T = 4  // seconds per step (full cycle = 8s for down+up)
+  const phase = (tSec % T) / T       // 0..1 within half cycle
+  const quantised = Math.round(phase * 4) / 4   // 0, 0.25, 0.5, 0.75, 1
+  // Mirror: open for T seconds, then return to 0 over T seconds.
+  // We compose a step wave that holds quantised for ~1.2s and snaps.
+  const step = Math.floor(tSec / 1.2)
+  const openness = [0, 0.25, 0.5, 0.75, 1, 0.75, 0.5, 0.25][step % 8]
+  const closing = 1 - openness             // 0 (open) .. 1 (closed)
+  // Non-linear: closing^1.5 gives a quick spike near full close, gentle tail when open
+  const forceN = Math.max(0, 28 * Math.pow(closing, 1.5) + (Math.random() - 0.5) * 0.6)
+  const stroke = 20 + openness * 60        // 20..80mm
   const gripper = {
-    open: +closing.toFixed(2),
+    open: +openness.toFixed(2),
     stroke: +stroke.toFixed(2),
     force: +forceN.toFixed(2),
   }
+  void quantised // (kept for clarity; the actual signal uses the step lookup)
   return { joints, force, gripper }
 }

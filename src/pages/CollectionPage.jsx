@@ -53,7 +53,7 @@ export default function CollectionPage() {
           ) : (
             <button
               onClick={() => setShowLogin(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-colors text-sm font-medium shadow-sm"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-colors text-sm font-medium shadow-md"
             >
               <LogIn size={15} />
               登录云平台
@@ -117,14 +117,14 @@ export default function CollectionPage() {
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium border border-border"
+                    className="px-3 py-1.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium border border-border"
                   >
                     <ChevronLeft size={14} /> 上一页
                   </button>
                   <button
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium border border-border"
+                    className="px-3 py-1.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium border border-border"
                   >
                     下一页 <ChevronRight size={14} />
                   </button>
@@ -138,7 +138,7 @@ export default function CollectionPage() {
               <h3 className="text-base text-foreground mb-6">请先登录云平台以查看采集任务</h3>
               <button
                 onClick={() => setShowLogin(true)}
-                className="px-6 py-2.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-colors font-medium inline-flex items-center gap-2"
+                className="px-7 py-3 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-colors font-medium inline-flex items-center gap-2 shadow-md"
               >
                 <LogIn size={16} />
                 登录
@@ -180,7 +180,7 @@ export default function CollectionPage() {
               </div>
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] font-medium"
+                className="w-full py-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] font-medium shadow-md"
               >
                 登录
               </button>

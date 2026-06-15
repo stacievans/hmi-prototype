@@ -25,7 +25,7 @@ export default function GripperCurveChart({
   const chartW = W - padL - padR
   const chartH = H - padT - padB
 
-  const OPEN_MIN = -1
+  const OPEN_MIN = 0
   const OPEN_MAX = 1
   const FORCE_MAX = 30
 
@@ -40,6 +40,8 @@ export default function GripperCurveChart({
     let forceD = ''
     let openLastV = 0
     let forceLastV = 0
+    let prevOpen = null
+    let prevX = null
 
     for (let i = 0; i < history.length; i++) {
       const h = history[i]
@@ -47,17 +49,26 @@ export default function GripperCurveChart({
       // openness normalised: prefer .open if present, else derive from stroke
       let openRaw = h.gripper?.open
       if (openRaw === undefined || openRaw === null) {
-        // derive -1..1 from stroke (assume 20..80mm)
+        // derive 0..1 from stroke (assume 20..80mm)
         const stroke = h.gripper?.stroke ?? 50
-        openRaw = Math.max(-1, Math.min(1, ((stroke - 50) / 30)))
+        openRaw = Math.max(0, Math.min(1, (stroke - 20) / 60))
       }
       const forceV = h.gripper?.force ?? 0
       const yOpen = padT + chartH - ((openRaw - OPEN_MIN) / openSpan) * chartH
       const yForce = padT + chartH - (forceV / FORCE_MAX) * chartH
-      openD += `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${yOpen.toFixed(1)} `
+      if (prevOpen === null) {
+        openD += `M${x.toFixed(1)},${yOpen.toFixed(1)} `
+      } else if (Math.abs(openRaw - prevOpen) > 1e-3) {
+        // Step: horizontal at previous y, then vertical jump, then continue
+        openD += `H${x.toFixed(1)} V${yOpen.toFixed(1)} `
+      } else {
+        openD += `L${x.toFixed(1)},${yOpen.toFixed(1)} `
+      }
       forceD += `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${yForce.toFixed(1)} `
       openLastV = openRaw
       forceLastV = forceV
+      prevOpen = openRaw
+      prevX = x
     }
     const lastX = padL + chartW
     const openLastY = padT + chartH - ((openLastV - OPEN_MIN) / openSpan) * chartH
@@ -73,7 +84,7 @@ export default function GripperCurveChart({
     )
   }
 
-  // Y axis: 5 ticks from -1 to 1 (left axis)
+  // Y axis: 5 ticks from 0 to 1 (left axis)
   const yTicks = Array.from({ length: 5 }, (_, i) => OPEN_MIN + ((OPEN_MAX - OPEN_MIN) * i) / 4)
   const yForOpen = (v) => padT + chartH - ((v - OPEN_MIN) / (OPEN_MAX - OPEN_MIN)) * chartH
   const yForForce = (v) => padT + chartH - (v / FORCE_MAX) * chartH
@@ -92,7 +103,7 @@ export default function GripperCurveChart({
         )
       })}
 
-      {/* Y axis labels - left (openness -1..1) */}
+      {/* Y axis labels - left (openness 0..1) */}
       {yTicks.map((v, i) => {
         const y = yForOpen(v)
         return (
@@ -127,17 +138,6 @@ export default function GripperCurveChart({
           </text>
         )
       })}
-
-      {/* Zero line (openness = 0) */}
-      <line
-        x1={padL}
-        y1={yForOpen(0)}
-        x2={padL + chartW}
-        y2={yForOpen(0)}
-        stroke="rgba(255,255,255,0.15)"
-        strokeWidth="1"
-        strokeDasharray="3 3"
-      />
 
       {/* Time axis */}
       {axisTicks.map((i) => {
