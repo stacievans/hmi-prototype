@@ -35,10 +35,11 @@ export default function TeleopSidePanel() {
             <button
               key={key}
               onClick={() => setInputSource(key)}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all relative
-                ${inputSource === key
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-md border transition-all relative active:scale-[0.98] ${
+                inputSource === key
                   ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border text-muted-foreground hover:border-muted-foreground hover:text-foreground'}`}
+                  : 'border-border text-muted-foreground hover:border-muted-foreground hover:text-foreground'
+              }`}
             >
               <Icon size={20} />
               <span className="text-xs">{label}</span>
@@ -50,7 +51,7 @@ export default function TeleopSidePanel() {
         </div>
         {inputSource ? (
           <div
-            className={`text-xs p-2 rounded-lg flex items-center gap-1.5 ${
+            className={`text-xs p-2 rounded-md flex items-center gap-1.5 ${
               (inputSource === 'exoskeleton' ? cd.exoskeleton : cd.vr)
                 ? 'bg-success/10 text-success'
                 : 'bg-danger/10 text-danger'
@@ -72,15 +73,15 @@ export default function TeleopSidePanel() {
           <button
             onClick={takeControl}
             disabled={!inputSource}
-            className="w-full py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-2.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium shadow-sm"
           >
-            <Play size={18} />
+            <Play size={16} />
             开启控制
           </button>
         ) : (
           <button
             onClick={releaseControl}
-            className="w-full py-3 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] flex items-center justify-center gap-2 text-sm font-medium border border-border"
           >
             退出控制
           </button>
@@ -97,9 +98,9 @@ export default function TeleopSidePanel() {
                 <TriangleAlert size={12} />
                 <span>缓动对齐中，请保持手臂静止</span>
               </div>
-              <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
+              <div className="w-full h-2 rounded-md bg-secondary overflow-hidden">
                 <div
-                  className="h-full bg-warning rounded-full transition-all duration-300"
+                  className="h-full bg-warning rounded-md transition-all duration-300"
                   style={{ width: `${easingProgress}%` }}
                 />
               </div>
@@ -109,15 +110,15 @@ export default function TeleopSidePanel() {
               <button
                 onClick={switchToFollow}
                 disabled={easingProgress < 100}
-                className="w-full py-2.5 rounded-lg border border-primary text-primary hover:bg-primary/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-md border border-primary text-primary hover:bg-primary/10 transition-colors active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium"
               >
-                <ArrowRightLeft size={16} />
+                <ArrowRightLeft size={14} />
                 切换随动模式
               </button>
             </div>
           )}
           {teleopMode === 'follow' && (
-            <div className="flex items-center gap-2 text-success text-xs p-3 rounded-lg bg-success/10">
+            <div className="flex items-center gap-2 text-success text-xs p-3 rounded-md bg-success/10">
               <Check size={14} />
               <span>随动模式 · 实时映射中</span>
             </div>
@@ -128,7 +129,7 @@ export default function TeleopSidePanel() {
       {controlState === 'controlling' && inputSource === 'vr' && (
         <div className="p-4 border-b border-border">
           <h4 className="text-xs text-muted-foreground mb-3 uppercase tracking-wider">运动模式</h4>
-          <div className="flex items-center gap-2 text-success text-xs p-3 rounded-lg bg-success/10">
+          <div className="flex items-center gap-2 text-success text-xs p-3 rounded-md bg-success/10">
             <Check size={14} />
             <span>标准模式 · 实时映射中</span>
           </div>

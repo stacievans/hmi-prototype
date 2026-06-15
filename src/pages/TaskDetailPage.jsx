@@ -365,21 +365,21 @@ export default function TaskDetailPage() {
               共 {filtered.length} 条，第 {page}/{totalPages} 页
             </span>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs"
-              >
-                <ChevronLeft size={14} /> 上一页
-              </button>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs"
-              >
-                下一页 <ChevronRight size={14} />
-              </button>
-            </div>
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium border border-border"
+                  >
+                    <ChevronLeft size={14} /> 上一页
+                  </button>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-xs font-medium border border-border"
+                  >
+                    下一页 <ChevronRight size={14} />
+                  </button>
+                </div>
           </div>
         )}
       </div>
@@ -414,9 +414,9 @@ export default function TaskDetailPage() {
           <div className="bg-card border border-border rounded-xl p-6 max-w-sm w-full mx-4">
             <h3 className="mb-3">打开工作站</h3>
             <p className="text-sm text-muted-foreground mb-6">即将进入工作站准备本次采集，是否继续？</p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setConfirmStart(false)} className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground">取消</button>
-              <button onClick={startCollect} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground">确认</button>
+            <div className="flex gap-2.5 justify-end">
+              <button onClick={() => setConfirmStart(false)} className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">取消</button>
+              <button onClick={startCollect} className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.98] transition-colors text-sm font-medium">确认</button>
             </div>
           </div>
         </div>
@@ -489,14 +489,14 @@ export default function TaskDetailPage() {
                   </p>
                 </>
               )}
-              <div className="flex gap-3 justify-end">
+              <div className="flex gap-2.5 justify-end">
                 {canSubmitNow ? (
                   <>
-                    <button onClick={() => setSubmitModal(false)} className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm">取消</button>
-                    <button onClick={submitTask} className="px-4 py-2 rounded-lg bg-success text-white text-sm">确认提交任务</button>
+                    <button onClick={() => setSubmitModal(false)} className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">取消</button>
+                    <button onClick={submitTask} className="px-4 py-2 rounded-md bg-success text-white hover:bg-success/90 active:scale-[0.98] transition-colors text-sm font-medium">确认提交任务</button>
                   </>
                 ) : (
-                  <button onClick={() => setSubmitModal(false)} className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm">知道了</button>
+                  <button onClick={() => setSubmitModal(false)} className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">知道了</button>
                 )}
               </div>
             </div>
@@ -510,9 +510,9 @@ export default function TaskDetailPage() {
           <div className="bg-card border border-border rounded-xl p-6 max-w-sm w-full mx-4">
             <h3 className="mb-3 text-destructive">删除文件</h3>
             <p className="text-sm text-muted-foreground mb-6">确认删除该采集文件？此操作不可恢复。</p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setDeleteItemId(null)} className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground">取消</button>
-              <button onClick={deleteItem} className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground">确认删除</button>
+            <div className="flex gap-2.5 justify-end">
+              <button onClick={() => setDeleteItemId(null)} className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">取消</button>
+              <button onClick={deleteItem} className="px-4 py-2 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-[0.98] transition-colors text-sm font-medium">确认删除</button>
             </div>
           </div>
         </div>

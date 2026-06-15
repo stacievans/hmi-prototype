@@ -561,11 +561,12 @@ function initialSample(tSec = 0) {
     const drift = Math.sin(2 * Math.PI * 0.3 * tSec + f.key.charCodeAt(0)) * forceAmp[f.key] * 0.3
     force[f.key] = +(forceAmp[f.key] * 0.4 + drift + noise).toFixed(2)
   }
-  // Gripper: stroke oscillates 20..80mm, force correlates (rises with closing)
-  const stroke = 50 + 30 * Math.sin(2 * Math.PI * 0.35 * tSec)
-  const closing = (stroke - 50) / 30   // -1..1
+  // Gripper: openness -1..1, stroke 20..80mm, force correlates with closing
+  const closing = Math.sin(2 * Math.PI * 0.35 * tSec)  // -1..1
+  const stroke = 50 + 30 * closing
   const forceN  = Math.max(0, 12 + 10 * closing + (Math.random() - 0.5) * 1.5)
   const gripper = {
+    open: +closing.toFixed(2),
     stroke: +stroke.toFixed(2),
     force: +forceN.toFixed(2),
   }

@@ -1,11 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../state/AppContext.jsx'
-import { ArrowLeft, Square, Play, LoaderCircle, ChevronDown, ChevronRight, Hand, Glasses, Check, TriangleAlert, ArrowRightLeft } from 'lucide-react'
-import CurvesPanel from '../components/charts/CurvesPanel.jsx'
+import {
+  ArrowLeft, Play, LoaderCircle, ChevronDown, ChevronRight,
+  Hand, Glasses, Check, TriangleAlert, ArrowRightLeft, Video, Maximize2, Eye, EyeOff, Circle,
+} from 'lucide-react'
+import GripperTimeDock from '../components/charts/GripperTimeDock.jsx'
 
 const MIN_DURATION = 3
 const MAX_DURATION = 300   // 5 minutes
+
+const CAMS = [
+  { id: 'head',  label: '头部相机' },
+  { id: 'chest', label: '胸部相机' },
+  { id: 'left',  label: '左手相机' },
+  { id: 'right', label: '右手相机' },
+]
 
 export default function WorkstationPage() {
   const { taskId } = useParams()
@@ -30,6 +40,8 @@ export default function WorkstationPage() {
   const [toast, setToast] = useState(null)
   const [showTaskDetails, setShowTaskDetails] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
+  const [enabledCams, setEnabledCams] = useState({ head: true, chest: true, left: true, right: true })
+  const [fullscreenCam, setFullscreenCam] = useState(null)
 
   // Tick recording time
   useEffect(() => {
@@ -166,21 +178,6 @@ export default function WorkstationPage() {
     nav(`/collection/task/${taskId}`)
   }
 
-  const handleCSV = useCallback((csv) => {
-    if (!csv) { flashToast('暂无可导出的数据'); return }
-    const fileName = `${task.taskId}_ep${(task.completedItems + 1).toString().padStart(4, '0')}_${Date.now()}.csv`
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = fileName
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    flashToast(`已导出 ${fileName}`)
-  }, [task])
-
   const flashToast = (msg) => {
     setToast({ msg, id: Date.now() })
     setTimeout(() => setToast(null), 2400)
@@ -195,6 +192,8 @@ export default function WorkstationPage() {
   ]
   const ep = task.completedItems + 1
   const epPct = Math.min(100, (task.completedItems / task.totalItems) * 100)
+  const enabledList = CAMS.filter((c) => enabledCams[c.id])
+  const fsCam = fullscreenCam ? CAMS.find((c) => c.id === fullscreenCam) : null
 
   return (
     <div className={`flex flex-col h-full overflow-hidden ${recordingState === 'recording' ? 'ring-4 ring-inset ring-destructive/60' : ''}`}>
@@ -203,52 +202,90 @@ export default function WorkstationPage() {
         <div className="flex items-center justify-between shrink-0 px-1">
           <button
             onClick={handleBack}
-            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors"
+            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors rounded-md px-2 py-1 -ml-2 hover:bg-secondary"
           >
             <ArrowLeft size={16} />
             返回
           </button>
           <div className="flex items-center gap-3">
             {recordingState === 'recording' && (
-              <div className="flex items-center gap-1.5 text-destructive text-xs">
+              <div className="flex items-center gap-1.5 text-destructive text-xs font-medium">
                 <span className="w-2 h-2 rounded-full bg-destructive animate-pulse-dot" />
                 REC
               </div>
             )}
-            <span className="text-sm">{task.name}</span>
+            <span className="text-sm font-medium">{task.name}</span>
             <span className="text-xs text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{task.taskId}</span>
           </div>
         </div>
 
+        {/* Main row: cameras (2/3) + side panel (1/3) */}
         <div className="flex-1 grid grid-cols-3 gap-3 min-h-0">
-          {/* Camera area */}
-          <div className="col-span-2 rounded-2xl border border-border bg-[#0a0d12] relative overflow-hidden flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-3">
-                {recordingState === 'recording'
-                  ? <Square size={28} className="text-destructive" />
-                  : <Play size={28} className="text-muted-foreground" />}
-              </div>
-              <p className="text-muted-foreground text-sm">
-                {recordingState === 'recording' ? '录制中...' : '准备录制'}
-              </p>
+          {/* Camera area: 2x2 grid, fills 2/3 width */}
+          <div className="col-span-2 rounded-md border border-border bg-[#0a0d12] relative overflow-hidden flex flex-col">
+            {/* Camera toggles */}
+            <div className="absolute top-2.5 left-2.5 z-10 flex gap-1">
+              {CAMS.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setEnabledCams((m) => ({ ...m, [c.id]: !m[c.id] }))}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors ${
+                    enabledCams[c.id]
+                      ? 'bg-primary/15 text-primary border border-primary/30'
+                      : 'bg-secondary/80 text-muted-foreground border border-border'
+                  }`}
+                >
+                  {enabledCams[c.id] ? <Eye size={11} /> : <EyeOff size={11} />}
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            {/* Camera grid */}
+            <div className="flex-1 p-1.5 pt-12">
+              {fsCam ? (
+                <CameraTile cam={fsCam} recording={recordingState === 'recording'} large />
+              ) : enabledList.length === 0 ? (
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">所有相机已关闭</div>
+              ) : (
+                <div className={`w-full h-full grid gap-1.5 ${enabledList.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  {enabledList.map((c) => (
+                    <div key={c.id} className="relative group rounded overflow-hidden">
+                      <CameraTile cam={c} recording={recordingState === 'recording'} />
+                      <button
+                        onClick={() => setFullscreenCam(c.id)}
+                        className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-black/60 text-white"
+                      >
+                        <Maximize2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {fsCam && (
+                <button
+                  onClick={() => setFullscreenCam(null)}
+                  className="absolute bottom-2.5 right-2.5 z-10 px-2.5 py-1 rounded-md bg-secondary/80 text-foreground text-[11px] hover:bg-secondary transition-colors border border-border"
+                >
+                  退出全屏
+                </button>
+              )}
             </div>
           </div>
 
           {/* Right side panel: progress / task details / collection timer / input source / teleop */}
-          <div className="rounded-2xl border border-border bg-[#0d1117] overflow-y-auto flex flex-col">
+          <div className="rounded-md border border-border bg-[#0d1117] overflow-y-auto flex flex-col">
             {/* Current progress */}
             <div className="p-3 border-b border-border">
-              <h4 className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">当前进度</h4>
+              <h4 className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider">当前进度</h4>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl text-primary" style={{ fontFamily: "'JetBrains Mono', monospace" }}>EP {ep.toString().padStart(4, '0')}</span>
+                <span className="text-2xl text-primary" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{ep.toString().padStart(2, '0')}</span>
                 <span className="text-xs text-muted-foreground">/ {task.totalItems}</span>
               </div>
               <div className="w-full h-1.5 rounded-full bg-secondary overflow-hidden mt-2">
                 <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${epPct}%` }} />
               </div>
-              <div className="flex justify-between text-xs text-muted-foreground mt-1.5">
-                <span>已完成 {task.completedItems}</span>
+              <div className="flex justify-between text-[10px] text-muted-foreground mt-1.5">
+                <span>EP {ep.toString().padStart(4, '0')}</span>
                 <span>{epPct.toFixed(0)}%</span>
               </div>
             </div>
@@ -259,21 +296,24 @@ export default function WorkstationPage() {
                 onClick={() => setShowTaskDetails((v) => !v)}
                 className="w-full flex items-center justify-between p-3 hover:bg-secondary/30 transition-colors"
               >
-                <h4 className="text-xs text-muted-foreground uppercase tracking-wider">任务详情</h4>
-                {showTaskDetails ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />}
+                <h4 className="text-[10px] text-muted-foreground uppercase tracking-wider">任务详情</h4>
+                {showTaskDetails ? <ChevronDown size={12} className="text-muted-foreground" /> : <ChevronRight size={12} className="text-muted-foreground" />}
               </button>
               {showTaskDetails && (
-                <div className="px-3 pb-3 text-xs space-y-3">
+                <div className="px-3 pb-3 text-xs space-y-2.5">
                   <div>
-                    <div className="text-muted-foreground mb-1">初始场景：</div>
-                    <div className="text-foreground">{task.initialScene}</div>
+                    <div className="text-muted-foreground mb-1">初始场景</div>
+                    <div className="text-foreground leading-relaxed">{task.initialScene}</div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground mb-1.5">步骤描述：</div>
+                    <div className="text-muted-foreground mb-1.5">步骤描述</div>
                     <ol className="space-y-1">
                       {(task.steps || []).map((s, i) => (
-                        <li key={i} className={`flex gap-2 ${i === currentStep && recordingState === 'recording' ? 'text-primary' : 'text-foreground'}`}>
-                          <span className="text-muted-foreground">{i + 1}.</span>
+                        <li
+                          key={i}
+                          className={`flex gap-2 leading-relaxed ${i === currentStep && recordingState === 'recording' ? 'text-primary' : 'text-foreground'}`}
+                        >
+                          <span className="text-muted-foreground shrink-0">{i + 1}.</span>
                           <span>{s}</span>
                         </li>
                       ))}
@@ -285,32 +325,32 @@ export default function WorkstationPage() {
 
             {/* Collection timer */}
             <div className="p-3 border-b border-border">
-              <h4 className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">采集计时</h4>
+              <h4 className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider">采集计时</h4>
               <div className="text-3xl text-center text-foreground my-2" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{formatTime(elapsed)}</div>
               {recordingState === 'recording' && elapsed > 0 && elapsed < MAX_DURATION && elapsed >= MAX_DURATION - 30 && (
-                <div className="text-xs text-warning text-center mt-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                <div className="text-[10px] text-warning text-center mt-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                   即将达到最大时长 {Math.floor(MAX_DURATION / 60)} 分钟
                 </div>
               )}
               {recordingState !== 'recording' ? (
                 <button
                   onClick={handleRecordClick}
-                  className="w-full py-2.5 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2.5 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-2 text-sm font-medium shadow-sm"
                 >
-                  <Play size={14} />
+                  <Circle size={10} className="fill-white" />
                   开始采集 (R)
                 </button>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={stopRecord}
-                    className="py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center justify-center gap-1 text-xs"
+                    className="py-2.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-1 text-xs font-medium"
                   >
                     结束采集 (S)
                   </button>
                   <button
                     onClick={() => setShowCancelConfirm(true)}
-                    className="py-2.5 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors flex items-center justify-center gap-1 text-xs"
+                    className="py-2.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] flex items-center justify-center gap-1 text-xs font-medium border border-border"
                   >
                     取消采集 (Esc)
                   </button>
@@ -321,35 +361,45 @@ export default function WorkstationPage() {
             {/* Footer: input source + teleop control */}
             <div className="bg-[#010409] mt-auto p-3 space-y-3">
               <div>
-                <h4 className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">输入源</h4>
+                <h4 className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider">输入源</h4>
                 <div className="grid grid-cols-2 gap-2">
                   {sources.map(({ key, label, connected, Icon }) => (
                     <button
                       key={key}
                       onClick={() => setInputSource(key)}
-                      className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all relative
-                        ${inputSource === key ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground'}`}
+                      className={`flex flex-col items-center gap-1.5 p-2.5 rounded-md border transition-all relative ${
+                        inputSource === key
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                      }`}
                     >
-                      <Icon size={16} />
-                      <span className="text-[10px]">{label}</span>
-                      <span className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${connected ? 'bg-success' : 'bg-danger'}`} />
+                      <Icon size={18} />
+                      <span className="text-[11px]">{label}</span>
+                      <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${connected ? 'bg-success' : 'bg-danger'}`} />
                     </button>
                   ))}
                 </div>
+                {inputSource && (
+                  <div className={`text-[10px] mt-2 flex items-center gap-1 ${(inputSource === 'exoskeleton' ? cd.exoskeleton : cd.vr) ? 'text-success' : 'text-danger'}`}>
+                    {(inputSource === 'exoskeleton' ? cd.exoskeleton : cd.vr)
+                      ? <><Check size={10} /> {inputSource === 'exoskeleton' ? '外骨骼' : 'VR'} 连接成功</>
+                      : <><TriangleAlert size={10} /> {inputSource === 'exoskeleton' ? '外骨骼' : 'VR'} 未连接</>}
+                  </div>
+                )}
               </div>
               <div>
-                <h4 className="text-xs text-muted-foreground mb-2 uppercase tracking-wider">遥操控制</h4>
+                <h4 className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider">遥操控制</h4>
                 {controlState === 'idle' ? (
                   <button
                     onClick={takeControl}
                     disabled={!inputSource}
-                    className="w-full py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 text-xs"
+                    className="w-full py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-xs font-medium"
                   >
                     <Play size={12} /> 开启控制
                   </button>
                 ) : (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center justify-between text-[10px]">
                       <span className="text-muted-foreground">运动模式</span>
                       <span className="text-warning">{teleopMode === 'easing' ? '缓动对齐' : '随动'}</span>
                     </div>
@@ -361,20 +411,20 @@ export default function WorkstationPage() {
                         <button
                           onClick={switchToFollow}
                           disabled={easingProgress < 100}
-                          className="w-full py-1.5 rounded border border-primary text-primary hover:bg-primary/10 transition-colors disabled:opacity-30 text-xs flex items-center justify-center gap-1"
+                          className="w-full py-1.5 rounded-md border border-primary text-primary hover:bg-primary/10 transition-colors active:scale-[0.98] disabled:opacity-30 text-xs flex items-center justify-center gap-1 font-medium"
                         >
                           <ArrowRightLeft size={11} /> 切换随动
                         </button>
                       </>
                     )}
                     {((inputSource === 'exoskeleton' && teleopMode === 'follow') || inputSource === 'vr') && (
-                      <div className="text-success text-xs flex items-center gap-1.5">
-                        <Check size={12} /> 实时映射中
+                      <div className="text-success text-[10px] flex items-center gap-1.5">
+                        <Check size={11} /> 实时映射中
                       </div>
                     )}
                     <button
                       onClick={releaseControl}
-                      className="w-full py-1.5 rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors text-xs"
+                      className="w-full py-1.5 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-xs font-medium border border-border"
                     >
                       退出控制
                     </button>
@@ -385,16 +435,16 @@ export default function WorkstationPage() {
           </div>
         </div>
 
-        {/* Curves panel (added on top of original) */}
+        {/* Gripper + force curves dock with scrubber (fixed 10s window) */}
         <div className="shrink-0">
-          <CurvesPanel onCSV={handleCSV} />
+          <GripperTimeDock />
         </div>
       </div>
 
       {/* Countdown */}
       {showCountdown && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-card border border-border rounded-2xl p-8 text-center">
+          <div className="bg-card border border-border rounded-md p-8 text-center shadow-2xl card-depth">
             <LoaderCircle size={32} className="mx-auto text-primary animate-spin mb-4" />
             <p className="text-muted-foreground text-sm mb-2">系统接管中</p>
             <p className="text-6xl text-primary" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{countdown}</p>
@@ -405,12 +455,22 @@ export default function WorkstationPage() {
       {/* Short recording warning */}
       {showWarnShort && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full mx-4">
+          <div className="bg-card border border-border rounded-md p-6 max-w-sm w-full mx-4 shadow-2xl card-depth">
             <h3 className="mb-3 text-warning">录制时长过短</h3>
             <p className="text-sm text-muted-foreground mb-6">本次录制时长不足 {MIN_DURATION} 秒，建议丢弃或继续录制。</p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => doStop(true)} className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground">丢弃</button>
-              <button onClick={() => setShowWarnShort(false)} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground">继续录制</button>
+            <div className="flex gap-2.5 justify-end">
+              <button
+                onClick={() => doStop(true)}
+                className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
+              >
+                丢弃
+              </button>
+              <button
+                onClick={() => setShowWarnShort(false)}
+                className="px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
+              >
+                继续录制
+              </button>
             </div>
           </div>
         </div>
@@ -419,14 +479,19 @@ export default function WorkstationPage() {
       {/* Long duration warning (5min timeout) */}
       {showWarnLong && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-card border-2 border-warning rounded-2xl p-6 max-w-sm w-full mx-4">
-            <div className="flex items-center gap-2 mb-3 text-warning">
+          <div className="bg-card border-2 border-warning rounded-md p-6 max-w-sm w-full mx-4 shadow-2xl card-depth">
+            <div className="flex items-center gap-2.5 mb-3 text-warning">
               <TriangleAlert size={20} />
-              <h3>采集已超过 {Math.floor(MAX_DURATION / 60)} 分钟，正在自动结束...</h3>
+              <h3>采集已超过 {Math.floor(MAX_DURATION / 60)} 分钟，正在自动结束…</h3>
             </div>
             <p className="text-sm text-muted-foreground mb-6">系统将在 5 秒后自动保存并结束本次录制。</p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => doStop()} className="px-4 py-2 rounded-lg bg-warning text-white">强制结束</button>
+            <div className="flex gap-2.5 justify-end">
+              <button
+                onClick={() => doStop()}
+                className="px-4 py-2 rounded-md bg-warning text-warning-foreground hover:bg-warning/90 transition-colors active:scale-[0.98] text-sm font-medium"
+              >
+                强制结束
+              </button>
             </div>
           </div>
         </div>
@@ -435,21 +500,21 @@ export default function WorkstationPage() {
       {/* Cancel recording confirmation (3s auto-confirm) */}
       {showCancelConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full mx-4">
+          <div className="bg-card border border-border rounded-md p-6 max-w-sm w-full mx-4 shadow-2xl card-depth">
             <h3 className="mb-3 text-warning">确认取消录制？</h3>
             <p className="text-sm text-muted-foreground mb-6">
               取消后本次数据将不保存，{cancelCountdown} 秒后自动确认。
             </p>
-            <div className="flex gap-3 justify-end">
+            <div className="flex gap-2.5 justify-end">
               <button
                 onClick={() => { setShowCancelConfirm(false); setCancelCountdown(3) }}
-                className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground"
+                className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
               >
                 继续录制
               </button>
               <button
                 onClick={() => { doStop(true); setShowCancelConfirm(false); setCancelCountdown(3) }}
-                className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground"
+                className="px-4 py-2 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] text-sm font-medium"
               >
                 确认取消 ({cancelCountdown})
               </button>
@@ -461,26 +526,58 @@ export default function WorkstationPage() {
       {/* Leave confirmation */}
       {showLeaveConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full mx-4">
+          <div className="bg-card border border-border rounded-md p-6 max-w-sm w-full mx-4 shadow-2xl card-depth">
             <h3 className="mb-3">离开确认</h3>
             <p className="text-sm text-muted-foreground mb-6">
               {recordingState === 'recording'
                 ? '当前正在录制中，离开将自动停止录制并释放设备控制。'
                 : '当前处于设备控制中，离开将自动释放控制，设备进入安全停止状态。'}
             </p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowLeaveConfirm(false)} className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground">取消</button>
-              <button onClick={confirmLeave} className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground">确认离开</button>
+            <div className="flex gap-2.5 justify-end">
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                className="px-4 py-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmLeave}
+                className="px-4 py-2 rounded-md bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] text-sm font-medium"
+              >
+                确认离开
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg bg-card border border-border text-sm shadow-2xl">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-md bg-card border border-border text-sm shadow-2xl card-depth">
           {toast.msg}
         </div>
       )}
+    </div>
+  )
+}
+
+function CameraTile({ cam, recording, large = false }) {
+  return (
+    <div
+      className={`w-full h-full bg-[#0a0d12] flex flex-col items-center justify-center border border-white/5 ${
+        large ? '' : 'rounded-md'
+      } relative overflow-hidden`}
+    >
+      <div className="absolute inset-0 opacity-30 pointer-events-none" style={{
+        backgroundImage: 'repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(255,255,255,0.04) 2px, rgba(255,255,255,0.04) 3px)',
+      }} />
+      <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-b ${recording ? 'from-destructive/60' : 'from-primary/40'} to-transparent`} />
+      <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-2 relative ${recording ? 'bg-destructive/15' : 'bg-secondary/50'}`}>
+        <Video size={24} className={recording ? 'text-destructive' : 'text-muted-foreground'} />
+      </div>
+      <span className="text-muted-foreground text-xs">{cam.label}</span>
+      <span className="text-muted-foreground/50 text-[10px] mt-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+        30fps · 1280x720
+      </span>
     </div>
   )
 }
