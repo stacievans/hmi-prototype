@@ -563,12 +563,13 @@ function initialSample(tSec = 0) {
   }
   // Gripper: openness 0..1 as a 2-level step (square wave, no intermediate
   // levels) — gripper commanded in just two positions: closed (0) and
-  // open (1).  force correlates non-linearly with openness: smaller
-  // openness (closed) → large force, large openness (open) → force decays
-  // non-linearly.
-  const PHASE_S = 5   // seconds per half (closed 5s, open 5s, full cycle 10s)
-  const half = Math.floor(tSec / PHASE_S) % 2
-  const openness = half === 0 ? 0 : 1
+  // open (1).  Open dwell is short (a quick release after a sustained
+  // close).  force correlates non-linearly with openness.
+  const CLOSE_S = 4   // closed (0) hold
+  const OPEN_S = 1.5  // open (1) hold (short release)
+  const total = CLOSE_S + OPEN_S
+  const phase = tSec % total
+  const openness = phase < CLOSE_S ? 0 : 1
   const closing = 1 - openness             // 0 (open) .. 1 (closed)
   // Non-linear: closing^1.5 gives a quick spike near full close, gentle tail when open
   const forceN = Math.max(0, 28 * Math.pow(closing, 1.5) + (Math.random() - 0.5) * 0.6)
