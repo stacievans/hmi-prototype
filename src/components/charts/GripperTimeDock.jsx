@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pause, Play, RotateCcw } from 'lucide-react'
+import { Circle, Pause, Play, RotateCcw, Snowflake } from 'lucide-react'
 import { useApp } from '../../state/AppContext.jsx'
 import GripperCurveChart from './GripperCurveChart.jsx'
 
@@ -8,8 +8,12 @@ const WINDOW_MS = 10_000
 /**
  * Bottom dock for gripper + force curves.  Renders a draggable time scrubber
  * (fixed 10s visible window) so the user can scrub back through the recorded
- * buffer.  While idle, the panel shows live data; while recording / replaying
- * it shows whatever is currently in the buffer.
+ * buffer.
+ *
+ * Display phases:
+ *   'hidden' — no recording yet → empty state ("等待开始采集")
+ *   'live'   — currently recording → live data streaming
+ *   'frozen' — recording stopped → chart is frozen on the last frame
  */
 export default function GripperTimeDock() {
   const {
@@ -18,6 +22,7 @@ export default function GripperTimeDock() {
     setPaused,
     recordingState,
     recordingBufferSize,
+    recordingDisplayState,
   } = useApp()
 
   // Scrub position in seconds, relative to "now" (0 = live, positive = back in time)
@@ -119,6 +124,19 @@ export default function GripperTimeDock() {
     try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
   }
 
+  // 'hidden' phase: no recording yet — show a calm empty-state placeholder
+  if (recordingDisplayState === 'hidden') {
+    return (
+      <div className="rounded-md border border-dashed border-border bg-card/40 flex flex-col items-center justify-center" style={{ minHeight: 220 }}>
+        <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center mb-2.5">
+          <Circle size={16} className="text-muted-foreground" />
+        </div>
+        <p className="text-sm text-muted-foreground">点击「开始采集」后显示实时数据曲线</p>
+        <p className="text-[10px] text-muted-foreground/60 mt-1">结束采集后曲线会冻结在最后一帧</p>
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-md border border-border bg-card card-depth overflow-hidden flex flex-col">
       {/* Header */}
@@ -132,6 +150,12 @@ export default function GripperTimeDock() {
             <span className="text-[10px] text-destructive flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse-dot" />
               实时采集
+            </span>
+          )}
+          {recordingDisplayState === 'frozen' && (
+            <span className="text-[10px] text-warning flex items-center gap-1">
+              <Snowflake size={11} />
+              已冻结
             </span>
           )}
         </div>
@@ -205,9 +229,13 @@ export default function GripperTimeDock() {
           <span>{rightLabel}s</span>
         </div>
         <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
-          <span>固定窗口 10s · 拖动时间轴回看历史</span>
+          <span>
+            {recordingDisplayState === 'frozen'
+              ? '已冻结 · 可拖动时间轴回看历史'
+              : '固定窗口 10s · 拖动时间轴回看历史'}
+          </span>
           <span className="text-muted-foreground/60" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            {clampedScrub > 0 ? `回看: -${clampedScrub.toFixed(1)}s` : '实时'}
+            {clampedScrub > 0 ? `回看: -${clampedScrub.toFixed(1)}s` : (recordingDisplayState === 'frozen' ? '冻结' : '实时')}
           </span>
         </div>
       </div>

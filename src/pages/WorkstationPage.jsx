@@ -25,6 +25,7 @@ export default function WorkstationPage() {
     takeControl, releaseControl, setRecordingState, recordingState,
     exportRecordingCSV, setTasks,
     connectedDevices, easingProgress,
+    setRecordingDisplayState, setPaused,
   } = useApp()
   const task = tasks.find((t) => t.id === taskId)
 
@@ -37,6 +38,7 @@ export default function WorkstationPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [cancelCountdown, setCancelCountdown] = useState(3)
   const [showWarnLong, setShowWarnLong] = useState(false)
+  const [showNeedControl, setShowNeedControl] = useState(false)
   const [toast, setToast] = useState(null)
   const [showTaskDetails, setShowTaskDetails] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
@@ -111,6 +113,8 @@ export default function WorkstationPage() {
   const startRecord = () => {
     setRecordingState('recording')
     setElapsed(0)
+    setRecordingDisplayState('live')
+    setPaused(false)
   }
   const stopRecord = () => {
     if (elapsed > 0 && elapsed < MIN_DURATION) {
@@ -147,6 +151,8 @@ export default function WorkstationPage() {
       flashToast('已取消本次录制')
     }
     setRecordingState('idle')
+    setRecordingDisplayState('frozen')  // 切换到 frozen：曲线冻结在最后 10s
+    setPaused(true)                     // 暂停仿真器，history 不再增长
     setElapsed(0)
     setShowWarnShort(false)
     setShowWarnLong(false)
@@ -155,7 +161,13 @@ export default function WorkstationPage() {
 
   const handleRecordClick = () => {
     if (recordingState === 'recording') { stopRecord(); return }
-    if (controlState !== 'controlling' || (inputSource === 'exoskeleton' && teleopMode !== 'follow')) {
+    // 必须先完成遥操控制才能采集
+    if (controlState !== 'controlling') {
+      setShowNeedControl(true)
+      return
+    }
+    // 已开启控制但 exoskeleton 还在缓动对齐时，给 3s 倒计时
+    if (inputSource === 'exoskeleton' && teleopMode !== 'follow') {
       setShowCountdown(true)
       setCountdown(3)
       return
@@ -339,13 +351,23 @@ export default function WorkstationPage() {
                 </div>
               )}
               {recordingState !== 'recording' ? (
-                <button
-                  onClick={handleRecordClick}
-                  className="w-full py-3 rounded-2xl bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-2 text-sm font-medium shadow-md"
-                >
-                  <Circle size={11} className="fill-white" strokeWidth={0} />
-                  开始采集 (R)
-                </button>
+                <>
+                  <button
+                    onClick={handleRecordClick}
+                    disabled={controlState !== 'controlling'}
+                    className="w-full py-3 rounded-2xl bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-destructive flex items-center justify-center gap-2 text-sm font-medium shadow-md"
+                    title={controlState !== 'controlling' ? '请先开启遥操控制' : ''}
+                  >
+                    <Circle size={11} className="fill-white" strokeWidth={0} />
+                    开始采集 (R)
+                  </button>
+                  {controlState !== 'controlling' && (
+                    <div className="text-[10px] text-warning text-center mt-2 flex items-center justify-center gap-1">
+                      <TriangleAlert size={10} />
+                      请先开启遥操控制
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="space-y-2">
                   <button
@@ -403,7 +425,7 @@ export default function WorkstationPage() {
                   <button
                     onClick={takeControl}
                     disabled={!inputSource}
-                    className="w-full py-3 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium shadow-md"
+                    className="w-full py-3 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium shadow-md animate-pulse-glow"
                   >
                     <Play size={14} fill="currentColor" />
                     开启控制
@@ -549,6 +571,29 @@ export default function WorkstationPage() {
                 className="px-5 py-2.5 rounded-xl bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] text-sm font-medium"
               >
                 确认离开
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Need control warning (shown when user presses R or clicks 开始采集 without control) */}
+      {showNeedControl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-card border border-border rounded-md p-6 max-w-sm w-full mx-4 shadow-2xl card-depth">
+            <div className="flex items-center gap-2.5 mb-3 text-warning">
+              <TriangleAlert size={20} />
+              <h3>请先开启遥操控制</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6">
+              必须先在下方"遥操控制"区域点击「开启控制」按钮，待设备完成接管后才能开始采集。
+            </p>
+            <div className="flex gap-2.5 justify-end">
+              <button
+                onClick={() => setShowNeedControl(false)}
+                className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
+              >
+                我知道了
               </button>
             </div>
           </div>

@@ -344,6 +344,9 @@ export function AppProvider({ children }) {
   const [easingProgress, setEasingProgress] = useState(0)
   const [recordingState, setRecordingState] = useState('idle') // idle | recording | replaying
   const [recordingTime, setRecordingTime] = useState(0)
+  // Recording chart display: 'hidden' = no data yet, 'live' = currently recording,
+  // 'frozen' = recording stopped, data is frozen on the last frame.
+  const [recordingDisplayState, setRecordingDisplayState] = useState('hidden')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userName, setUserName] = useState('')
   const [user, setUser] = useState({ name: '' })
@@ -528,6 +531,7 @@ export function AppProvider({ children }) {
     easingProgress, setEasingProgress,
     recordingState, setRecordingState,
     recordingTime, setRecordingTime,
+    recordingDisplayState, setRecordingDisplayState,
     isLoggedIn, setIsLoggedIn,
     userName, setUserName,
     user,
