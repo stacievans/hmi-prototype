@@ -38,9 +38,27 @@ export default function GripperTimeDock() {
     }, 250)
     return () => clearInterval(t)
   }, [recordingState, recordingBufferSize])
+
+  // Total collection time in seconds (right edge of the time scale)
   const totalBufferSec = bufferSize > 1 ? (bufferSize - 1) / 30 : 0
+  // Scrub position in seconds, relative to "now" (0 = live, positive = back in time)
   const maxScrubSec = Math.max(0, totalBufferSec - WINDOW_MS / 1000)
   const clampedScrub = Math.min(Math.max(0, scrubSec), maxScrubSec)
+
+  // Time labels shown at the ends of the scale
+  const rightLabel = totalBufferSec.toFixed(1)
+  const leftLabel = Math.max(0, totalBufferSec - WINDOW_MS / 1000).toFixed(1)
+  // Where the visible 10s window starts on the full time scale (in seconds).
+  const leftScrubValue = Math.max(0, totalBufferSec - WINDOW_MS / 1000 - clampedScrub)
+  // Thumb position is fraction of full scale at which the visible 10s
+  // window starts (its left edge).
+  const thumbFrac = totalBufferSec === 0 ? 0 : Math.max(0, Math.min(1, leftScrubValue / totalBufferSec))
+
+  // Tick marks every 1s, distributed across the full time scale
+  const tickCount = Math.max(2, Math.floor(totalBufferSec) + 1)
+  const tickDivs = Array.from({ length: tickCount }, (_, i) => (
+    <div key={i} className="w-px h-1.5 bg-border" />
+  ))
 
   // Visible window t-range in ms (relative to last live sample t)
   const lastT = history.length > 0 ? history[history.length - 1].t : 0
@@ -53,9 +71,9 @@ export default function GripperTimeDock() {
     if (scrubSec > maxScrubSec) setScrubSec(maxScrubSec)
   }, [maxScrubSec, scrubSec])
 
-  // Mouse drag on the track
+  // Mouse drag on the track — the user drags the thumb to scrub
   const onPointerDown = (e) => {
-    if (maxScrubSec === 0) return
+    if (totalBufferSec <= WINDOW_MS / 1000) return
     draggingRef.current = true
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
     updateFromPointer(e)
@@ -73,7 +91,12 @@ export default function GripperTimeDock() {
     const rect = trackRef.current.getBoundingClientRect()
     const x = Math.min(Math.max(0, e.clientX - rect.left), rect.width)
     const frac = rect.width === 0 ? 0 : x / rect.width
-    setScrubSec(frac * maxScrubSec)
+    // Map thumb position (frac of full scale) back to scrubSec
+    // visible window left edge = totalBufferSec * frac
+    // scrubSec = (totalBufferSec * frac) - (totalBufferSec - WINDOW_MS/1000)
+    const visibleLeft = frac * totalBufferSec
+    const desiredScrub = visibleLeft - (totalBufferSec - WINDOW_MS / 1000)
+    setScrubSec(Math.max(0, Math.min(maxScrubSec, desiredScrub)))
   }
 
   return (
@@ -118,45 +141,47 @@ export default function GripperTimeDock() {
         <GripperCurveChart history={visibleHistory} height={130} windowMs={WINDOW_MS} />
       </div>
 
-      {/* Scrubber */}
+      {/* Scrubber
+          Left = 0 (or total-time − 10s once the buffer is long enough),
+          Right = current collection time.  Thumb position marks the left
+          edge of the visible 10s window. */}
       <div className="px-3 pb-2 pt-1">
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          <span>-{maxScrubSec.toFixed(1)}s</span>
+          <span>{leftLabel}s</span>
           <div
             ref={trackRef}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
-            className={`flex-1 h-5 relative select-none touch-none ${maxScrubSec === 0 ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            className={`flex-1 h-5 relative select-none touch-none ${totalBufferSec <= WINDOW_MS / 1000 ? 'cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {/* Track */}
             <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 rounded-full bg-secondary" />
-            {/* Window indicator (10s) */}
+            {/* Visible window indicator (10s wide) — its left edge sits at
+                the thumb's position so dragging the thumb scrolls the window */}
             <div
               className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full bg-primary/50"
               style={{
-                left: `${maxScrubSec === 0 ? 0 : (clampedScrub / maxScrubSec) * 100}%`,
-                right: '0%',
+                left: `${thumbFrac * 100}%`,
+                width: `${(WINDOW_MS / 1000 / totalBufferSec) * 100}%`,
               }}
             />
             {/* Tick marks every 1s */}
             <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between pointer-events-none">
-              {Array.from({ length: 11 }, (_, i) => (
-                <div key={i} className="w-px h-1.5 bg-border" />
-              ))}
+              {tickDivs}
             </div>
-            {/* Thumb */}
+            {/* Thumb (left edge of visible 10s window) */}
             <div
               className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary border-2 border-background shadow-sm"
-              style={{ left: `calc(${maxScrubSec === 0 ? 0 : (clampedScrub / maxScrubSec) * 100}% - 6px)` }}
+              style={{ left: `calc(${thumbFrac * 100}% - 6px)` }}
             />
           </div>
-          <span>0s</span>
+          <span>{rightLabel}s</span>
         </div>
         <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
           <span>固定窗口 10s · 拖动时间轴回看历史</span>
           <span className="text-muted-foreground/60" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-            {clampedScrub > 0 ? `回看 -${clampedScrub.toFixed(1)}s` : '实时'}
+            {clampedScrub > 0 ? `窗口: ${leftLabel}s – ${rightLabel}s` : '实时'}
           </span>
         </div>
       </div>

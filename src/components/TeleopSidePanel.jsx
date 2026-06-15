@@ -1,10 +1,10 @@
 import { useApp } from '../state/AppContext.jsx'
-import { Hand, Glasses, Play, ArrowRightLeft, TriangleAlert, Check } from 'lucide-react'
+import { Hand, Glasses, Play, TriangleAlert, Check } from 'lucide-react'
 
 export default function TeleopSidePanel() {
   const {
     controlState, teleopMode, inputSource, setInputSource,
-    easingProgress, takeControl, releaseControl, switchToFollow,
+    easingProgress, takeControl, releaseControl,
     connectedDevices, multipleDevicesConnected,
   } = useApp()
 
@@ -107,14 +107,6 @@ export default function TeleopSidePanel() {
               <span className="text-xs text-muted-foreground block" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                 对齐进度: {Math.round(easingProgress)}%
               </span>
-              <button
-                onClick={switchToFollow}
-                disabled={easingProgress < 100}
-                className="w-full py-2.5 rounded-xl border border-primary text-primary hover:bg-primary/10 transition-colors active:scale-[0.98] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium"
-              >
-                <ArrowRightLeft size={14} />
-                切换随动模式
-              </button>
             </div>
           )}
           {teleopMode === 'follow' && (

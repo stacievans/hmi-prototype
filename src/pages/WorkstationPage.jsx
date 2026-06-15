@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../state/AppContext.jsx'
 import {
   ArrowLeft, Play, LoaderCircle, ChevronDown, ChevronRight,
-  Hand, Glasses, Check, TriangleAlert, ArrowRightLeft, Video, Maximize2, Eye, EyeOff, Circle,
+  Hand, Glasses, Check, TriangleAlert, Video, Maximize2, Eye, EyeOff, Circle,
 } from 'lucide-react'
 import GripperTimeDock from '../components/charts/GripperTimeDock.jsx'
 
@@ -24,7 +24,7 @@ export default function WorkstationPage() {
     tasks, controlState, teleopMode, inputSource, setInputSource,
     takeControl, releaseControl, setRecordingState, recordingState,
     exportRecordingCSV, setTasks,
-    connectedDevices, easingProgress, switchToFollow,
+    connectedDevices, easingProgress,
   } = useApp()
   const task = tasks.find((t) => t.id === taskId)
 
@@ -405,18 +405,9 @@ export default function WorkstationPage() {
                       <span className="text-warning">{teleopMode === 'easing' ? '缓动对齐' : '随动'}</span>
                     </div>
                     {inputSource === 'exoskeleton' && teleopMode === 'easing' && (
-                      <>
-                        <div className="w-full h-1.5 rounded-full bg-secondary overflow-hidden">
-                          <div className="h-full bg-warning rounded-full transition-all" style={{ width: `${easingProgress}%` }} />
-                        </div>
-                        <button
-                          onClick={switchToFollow}
-                          disabled={easingProgress < 100}
-                          className="w-full py-2.5 rounded-xl border border-primary text-primary hover:bg-primary/10 transition-colors active:scale-[0.98] disabled:opacity-30 text-xs flex items-center justify-center gap-1.5 font-medium"
-                        >
-                          <ArrowRightLeft size={12} /> 切换随动
-                        </button>
-                      </>
+                      <div className="w-full h-1.5 rounded-full bg-secondary overflow-hidden">
+                        <div className="h-full bg-warning rounded-full transition-all" style={{ width: `${easingProgress}%` }} />
+                      </div>
                     )}
                     {((inputSource === 'exoskeleton' && teleopMode === 'follow') || inputSource === 'vr') && (
                       <div className="text-success text-[10px] flex items-center gap-1.5">
