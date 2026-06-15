@@ -381,13 +381,12 @@ export function AppProvider({ children }) {
   // Auto switch to follow when easing reaches 100
   useEffect(() => {
     if (controlState === 'controlling' && teleopMode === 'easing' && easingProgress >= 100) {
-      // Add a slight delay for better UX
       const timer = setTimeout(() => {
-        switchToFollow()
+        setTeleopMode('follow')
       }, 500)
       return () => clearTimeout(timer)
     }
-  }, [controlState, teleopMode, easingProgress, switchToFollow])
+  }, [controlState, teleopMode, easingProgress])
 
   // Real-time data tick (30Hz). When paused, the curve freezes but the chart still draws.
   useEffect(() => {
