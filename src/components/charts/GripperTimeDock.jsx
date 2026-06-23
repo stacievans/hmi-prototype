@@ -18,6 +18,7 @@ const WINDOW_MS = 10_000
 export default function GripperTimeDock() {
   const {
     history,
+    frozenHistory,
     paused,
     setPaused,
     recordingState,
@@ -36,20 +37,29 @@ export default function GripperTimeDock() {
     typeof recordingBufferSize === 'function' ? recordingBufferSize() : 0,
   )
   useEffect(() => {
-    if (recordingState === 'replaying') return
+    if (recordingState === 'replaying' || recordingDisplayState === 'frozen') return
     const t = setInterval(() => {
       const n = typeof recordingBufferSize === 'function' ? recordingBufferSize() : 0
       setBufferSize((prev) => (prev === n ? prev : n))
     }, 250)
     return () => clearInterval(t)
-  }, [recordingState, recordingBufferSize])
+  }, [recordingState, recordingDisplayState, recordingBufferSize])
+
+  const isFrozen = recordingDisplayState === 'frozen'
+  const chartHistory = isFrozen ? frozenHistory : history
 
   // Use the larger of (recording buffer time) and (live history time) so the
   // timeline always reflects the *actual* elapsed time, even when no recording
   // is in progress.  Right side of the scrubber shows this value in seconds.
-  const recordingTime = bufferSize > 1 ? (bufferSize - 1) / 30 : 0
-  const liveTime = history.length > 0 ? history[history.length - 1].t / 1000 : 0
-  const totalBufferSec = Math.max(recordingTime, liveTime)
+  const recordingTime = isFrozen
+    ? (frozenHistory.length > 1
+      ? (frozenHistory[frozenHistory.length - 1].t - frozenHistory[0].t) / 1000
+      : frozenHistory.length === 1 ? 0 : 0)
+    : bufferSize > 1 ? (bufferSize - 1) / 30 : 0
+  const liveTime = chartHistory.length > 0 ? chartHistory[chartHistory.length - 1].t / 1000 : 0
+  const totalBufferSec = isFrozen
+    ? (chartHistory.length > 1 ? (chartHistory[chartHistory.length - 1].t - chartHistory[0].t) / 1000 : 0)
+    : Math.max(recordingTime, liveTime)
 
   const windowSec = WINDOW_MS / 1000
   const maxScrubSec = Math.max(0, totalBufferSec - windowSec)
@@ -78,16 +88,25 @@ export default function GripperTimeDock() {
     <div key={i} className="w-px h-1 bg-border" />
   ))
 
-  // Visible window t-range in ms (relative to last live sample t)
-  const lastT = history.length > 0 ? history[history.length - 1].t : 0
-  const tStart = lastT - WINDOW_MS - clampedScrub * 1000
-  const tEnd = lastT - clampedScrub * 1000
-  const visibleHistory = history.filter((h) => h.t >= tStart - 50 && h.t <= tEnd + 50)
+  // Visible window t-range in ms (relative to last sample t)
+  const lastT = chartHistory.length > 0 ? chartHistory[chartHistory.length - 1].t : 0
+  const firstT = chartHistory.length > 0 ? chartHistory[0].t : 0
+  const tStart = isFrozen
+    ? Math.max(firstT, lastT - WINDOW_MS - clampedScrub * 1000)
+    : lastT - WINDOW_MS - clampedScrub * 1000
+  const tEnd = isFrozen ? lastT - clampedScrub * 1000 : lastT - clampedScrub * 1000
+  const visibleHistory = chartHistory.filter((h) => h.t >= tStart - 50 && h.t <= tEnd + 50)
 
-  // Clamp scrub when buffer shrinks
+  // Clamp scrub when buffer shrinks; reset to latest when entering frozen/live
   useEffect(() => {
     if (scrubSec > maxScrubSec) setScrubSec(maxScrubSec)
   }, [maxScrubSec, scrubSec])
+
+  useEffect(() => {
+    if (recordingDisplayState === 'frozen' || recordingDisplayState === 'live') {
+      setScrubSec(0)
+    }
+  }, [recordingDisplayState])
 
   // Convert a pointer X-coordinate to a new scrubSec value.  The track spans
   // the full [0, totalBufferSec] range, and clicking at frac f means
@@ -160,14 +179,16 @@ export default function GripperTimeDock() {
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setPaused((p) => !p)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors font-medium"
-            title={paused ? '继续' : '暂停'}
-          >
-            {paused ? <Play size={11} /> : <Pause size={11} />}
-            {paused ? '继续' : '冻结'}
-          </button>
+          {!isFrozen && (
+            <button
+              onClick={() => setPaused((p) => !p)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors font-medium"
+              title={paused ? '继续' : '暂停'}
+            >
+              {paused ? <Play size={11} /> : <Pause size={11} />}
+              {paused ? '继续' : '暂停'}
+            </button>
+          )}
           <button
             onClick={() => setScrubSec(0)}
             disabled={maxScrubSec === 0}

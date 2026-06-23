@@ -1,9 +1,10 @@
-import { ClipboardList, Cpu, Plug, Settings as SettingsIcon } from 'lucide-react'
+import { ClipboardList, Cpu, Plug, Settings as SettingsIcon, AlertTriangle } from 'lucide-react'
 import logoUrl from '../assets/智平方logo.svg'
 
 const NAV = [
   { path: '/teleop', icon: Plug, label: '连接', key: 'connect' },
   { path: '/collection', icon: ClipboardList, label: '采集', key: 'collection' },
+  { path: '/anomaly', icon: AlertTriangle, label: '异常数据', key: 'anomaly' },
   { path: '/devices', icon: Cpu, label: '设备', key: 'devices' },
   { path: '/settings', icon: SettingsIcon, label: '设置', key: 'settings' },
 ]

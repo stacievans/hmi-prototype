@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../state/AppContext.jsx'
-import { ArrowLeft, Archive, Send, Play, ArchiveRestore, LoaderCircle, Trash2, MonitorPlay, ChevronLeft, ChevronRight, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, Archive, Send, Play, ArchiveRestore, LoaderCircle, MonitorPlay, ChevronLeft, ChevronRight, TriangleAlert, X, Info } from 'lucide-react'
 
 const COMPRESS_OPTS = [
   { value: 'all', label: '全部压缩状态' },
@@ -16,11 +16,176 @@ const UPLOAD_OPTS = [
   { value: 'uploaded', label: '已上传' },
   { value: 'failed', label: '失败' },
 ]
+const QUALITY_OPTS = [
+  { value: 'all', label: '全部质检状态' },
+  { value: 'passed', label: '合格' },
+  { value: 'failed', label: '异常' },
+  { value: 'warning', label: '警告' },
+  { value: 'pending', label: '待检' },
+]
 
 const STATUS_BADGE = {
   collect: { pending: ['待采集','text-muted-foreground'], done: ['已采集','text-success'] },
   compress: { pending: ['待压缩','text-muted-foreground'], compressing: ['压缩中','text-warning'], done: ['已压缩','text-success'] },
   upload: { pending: ['待上传','text-muted-foreground'], uploading: ['上传中','text-primary'], uploaded: ['已上传','text-success'], failed: ['失败','text-destructive'] },
+}
+
+const QUALITY_BADGE = {
+  passed: ['合格', 'bg-success/20 text-success'],
+  failed: ['异常', 'bg-destructive/20 text-destructive'],
+  warning: ['警告', 'bg-warning/20 text-warning'],
+  pending: ['待检', 'bg-secondary text-muted-foreground'],
+}
+
+const CHIP_BASE = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium'
+
+/** 可点击质检标签：行内样式覆盖全局 button { background: none } */
+const CHIP_BUTTON_LAYOUT = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '2px 8px',
+  borderRadius: '9999px',
+  fontSize: '12px',
+  fontWeight: 500,
+  lineHeight: 1.25,
+  gap: '4px',
+  border: 'none',
+  fontFamily: 'inherit',
+  cursor: 'pointer',
+}
+
+const QUALITY_CHIP_INLINE = {
+  failed: {
+    backgroundColor: 'rgba(248, 81, 73, 0.2)',
+    color: '#f85149',
+  },
+  warning: {
+    backgroundColor: 'rgba(210, 153, 34, 0.2)',
+    color: '#d29922',
+  },
+}
+
+const CHIP_BUTTON_HOVER = {
+  failed: 'hover:brightness-110 hover:shadow-[inset_0_0_0_1px_rgba(248,81,73,0.45)]',
+  warning: 'hover:brightness-110 hover:shadow-[inset_0_0_0_1px_rgba(210,153,34,0.45)]',
+}
+
+/** 批量压缩/上传仅处理 passed、warning，排除 failed 与 pending */
+function isBatchQualityEligible(item) {
+  return item.qualityStatus === 'passed' || item.qualityStatus === 'warning'
+}
+
+function compressEligible(item) {
+  return item.compressStatus === 'pending' && item.collectStatus === 'done' && isBatchQualityEligible(item)
+}
+
+function uploadEligible(item) {
+  return item.compressStatus === 'done' && item.uploadStatus === 'pending' && isBatchQualityEligible(item)
+}
+
+/** 批量上传时因 failed / pending 被排除的条目数 */
+function countUploadSkippedByQuality(items) {
+  return items.filter(
+    (it) => it.compressStatus === 'done' && it.uploadStatus === 'pending'
+      && (it.qualityStatus === 'failed' || it.qualityStatus === 'pending'),
+  ).length
+}
+
+function QualityBadge({ item, onInspect }) {
+  const label = QUALITY_BADGE[item.qualityStatus]?.[0] ?? QUALITY_BADGE.pending[0]
+  const clickable = item.qualityStatus === 'failed' || item.qualityStatus === 'warning'
+
+  if (!clickable) {
+    const chip = QUALITY_BADGE[item.qualityStatus]?.[1] ?? QUALITY_BADGE.pending[1]
+    return (
+      <span className={`${CHIP_BASE} ${chip}`}>
+        {label}
+      </span>
+    )
+  }
+
+  const chipStyle = QUALITY_CHIP_INLINE[item.qualityStatus]
+
+  return (
+    <button
+      type="button"
+      onClick={() => onInspect(item)}
+      className={`transition-all active:scale-[0.98] ${CHIP_BUTTON_HOVER[item.qualityStatus] ?? ''}`}
+      style={{ ...CHIP_BUTTON_LAYOUT, ...chipStyle }}
+      aria-label={`查看${label}详情`}
+    >
+      {label}
+      <Info size={12} strokeWidth={2} className="shrink-0 opacity-50" aria-hidden="true" />
+    </button>
+  )
+}
+
+function DrawerField({ label, children }) {
+  return (
+    <div>
+      <div className="text-xs text-muted-foreground mb-1.5">{label}</div>
+      <div className="text-sm text-foreground leading-relaxed">{children}</div>
+    </div>
+  )
+}
+
+function QualityDetailDrawer({ item, onClose }) {
+  if (!item) return null
+  const cfg = QUALITY_BADGE[item.qualityStatus] || QUALITY_BADGE.pending
+  const reasons = item.anomalyReasons ?? []
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
+      <aside
+        className="fixed top-0 right-0 bottom-0 z-50 w-[22rem] max-w-[90vw] bg-card border-l border-border shadow-2xl flex flex-col card-depth"
+        role="dialog"
+        aria-labelledby="quality-drawer-title"
+      >
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-border shrink-0">
+          <h3 id="quality-drawer-title" className="text-sm font-medium">质检详情</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            aria-label="关闭"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-5">
+          <DrawerField label="文件名">
+            <span className="break-all" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{item.fileName}</span>
+          </DrawerField>
+          <DrawerField label="质检状态">
+            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${cfg[1]}`}>{cfg[0]}</span>
+          </DrawerField>
+          <DrawerField label="异常类型">
+            {item.anomalyType ?? '—'}
+          </DrawerField>
+          <DrawerField label="异常原因">
+            {reasons.length > 0 ? (
+              <ul className="space-y-2">
+                {reasons.map((r, i) => (
+                  <li key={i} className="flex gap-2 text-sm leading-relaxed">
+                    <span className="text-muted-foreground shrink-0 tabular-nums">{i + 1}.</span>
+                    <span className="break-words">{r}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </DrawerField>
+          <DrawerField label="本地存储地址">
+            <span className="break-all text-xs" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              {item.localPath || '—'}
+            </span>
+          </DrawerField>
+        </div>
+      </aside>
+    </>
+  )
 }
 
 export default function TaskDetailPage() {
@@ -32,13 +197,14 @@ export default function TaskDetailPage() {
   const [page, setPage] = useState(1)
   const [cFilter, setCFilter] = useState('all')
   const [uFilter, setUFilter] = useState('all')
+  const [qFilter, setQFilter] = useState('all')
   const pageSize = 8
 
-  const [progress, setProgress] = useState(null)   // { mode, idx, total, fileName }
+  const [progress, setProgress] = useState(null)   // { mode, idx, total, fileName, skippedUpload? }
   const [submitModal, setSubmitModal] = useState(false)
-  const [deleteItemId, setDeleteItemId] = useState(null)
   const [confirmStart, setConfirmStart] = useState(false)
   const [toast, setToast] = useState(null)
+  const [qualityDrawerItem, setQualityDrawerItem] = useState(null)
 
   // Drive the batch progress for compress / upload
   useEffect(() => {
@@ -47,9 +213,8 @@ export default function TaskDetailPage() {
       setProgress((p) => p ? { ...p, idx: p.idx + 1 } : p)
       setTasks((all) => all.map((tk) => {
         if (tk.id !== taskId) return tk
-        const targets = tk.items.filter((it) => progress.mode === 'compressing'
-          ? it.compressStatus === 'pending' && it.collectStatus === 'done'
-          : it.compressStatus === 'done' && it.uploadStatus === 'pending')
+        const targets = tk.items.filter((it) =>
+          progress.mode === 'compressing' ? compressEligible(it) : uploadEligible(it))
         const current = targets[progress.idx]
         if (!current) return tk
         return {
@@ -67,7 +232,17 @@ export default function TaskDetailPage() {
 
   useEffect(() => {
     if (progress && progress.idx >= progress.total) {
-      const t = setTimeout(() => setProgress(null), 600)
+      const t = setTimeout(() => {
+        if (progress.mode === 'uploading') {
+          const skipped = progress.skippedUpload ?? 0
+          flashToast(
+            skipped > 0
+              ? `已上传 ${progress.total} 条，${skipped} 条未上传（异常/待检）`
+              : `已上传 ${progress.total} 条`,
+          )
+        }
+        setProgress(null)
+      }, 600)
       return () => clearTimeout(t)
     }
   }, [progress])
@@ -79,16 +254,26 @@ export default function TaskDetailPage() {
 
   const startCompress = () => {
     if (!task) return
-    const list = task.items.filter((it) => it.compressStatus === 'pending' && it.collectStatus === 'done')
-    if (list.length === 0) { flashToast('没有需要压缩的文件'); return }
-    setProgress({ mode: 'compressing', idx: 0, total: list.length, fileName: list[0].fileName })
+    const list = task.items.filter(compressEligible)
+    const skippedQuality = task.items.filter(
+      (it) => it.compressStatus === 'pending' && it.collectStatus === 'done' && it.qualityStatus === 'failed',
+    ).length
+    if (list.length === 0) {
+      flashToast(skippedQuality > 0 ? `没有可压缩的文件，${skippedQuality} 条因质检异常已跳过` : '没有需要压缩的文件')
+      return
+    }
+    setProgress({ mode: 'compressing', idx: 0, total: list.length, fileName: list[0].fileName, skippedQuality })
   }
 
   const startUpload = () => {
     if (!task) return
-    const list = task.items.filter((it) => it.compressStatus === 'done' && it.uploadStatus === 'pending')
-    if (list.length === 0) { flashToast('没有需要上传的文件'); return }
-    setProgress({ mode: 'uploading', idx: 0, total: list.length, fileName: list[0].fileName })
+    const list = task.items.filter(uploadEligible)
+    const skippedUpload = countUploadSkippedByQuality(task.items)
+    if (list.length === 0) {
+      flashToast(skippedUpload > 0 ? '没有可上传的文件' : '没有需要上传的文件')
+      return
+    }
+    setProgress({ mode: 'uploading', idx: 0, total: list.length, fileName: list[0].fileName, skippedUpload })
   }
 
   const startCollect = () => {
@@ -102,24 +287,15 @@ export default function TaskDetailPage() {
     flashToast('任务已提交至云平台')
   }
 
-  const deleteItem = () => {
-    if (!deleteItemId) return
-    setTasks((all) => all.map((tk) => tk.id !== taskId ? tk : {
-      ...tk,
-      items: tk.items.filter((it) => it.id !== deleteItemId),
-      completedItems: Math.max(0, tk.completedItems - 1),
-    }))
-    setDeleteItemId(null)
-  }
-
   const filtered = useMemo(() => {
     if (!task) return []
     return task.items.filter((it) => {
       if (cFilter !== 'all' && it.compressStatus !== cFilter) return false
       if (uFilter !== 'all' && it.uploadStatus !== uFilter) return false
+      if (qFilter !== 'all' && it.qualityStatus !== qFilter) return false
       return true
     })
-  }, [task, cFilter, uFilter])
+  }, [task, cFilter, uFilter, qFilter])
 
   if (!task) {
     return <div className="flex-1 flex items-center justify-center text-muted-foreground">任务未找到</div>
@@ -262,6 +438,16 @@ export default function TaskDetailPage() {
               {UPLOAD_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <span>质检:</span>
+            <select
+              value={qFilter}
+              onChange={(e) => { setQFilter(e.target.value); setPage(1) }}
+              className="bg-secondary border border-border text-foreground text-xs rounded px-2 py-1 focus:border-primary focus:outline-none"
+            >
+              {QUALITY_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-3">
@@ -271,17 +457,17 @@ export default function TaskDetailPage() {
             </div>
           ) : (
             <div className="rounded-xl border border-border overflow-hidden">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-fixed">
                 <thead className="bg-secondary/50 text-xs text-muted-foreground">
                   <tr>
-                    <th className="text-left px-3 py-2.5 font-medium w-10">#</th>
-                    <th className="text-left px-3 py-2.5 font-medium">文件名</th>
-                    <th className="text-left px-3 py-2.5 font-medium">采集时间</th>
-                    <th className="text-left px-3 py-2.5 font-medium">大小</th>
-                    <th className="text-left px-3 py-2.5 font-medium">时长</th>
-                    <th className="text-left px-3 py-2.5 font-medium">压缩</th>
-                    <th className="text-left px-3 py-2.5 font-medium">上传</th>
-                    <th className="text-left px-3 py-2.5 font-medium w-20">操作</th>
+                    <th className="text-left px-2 py-2.5 font-medium w-11">#</th>
+                    <th className="text-left px-3 py-2.5 font-medium min-w-0">文件名</th>
+                    <th className="text-left px-2 py-2.5 font-medium w-[8.5rem]">采集时间</th>
+                    <th className="text-left px-2 py-2.5 font-medium w-[4.5rem]">大小</th>
+                    <th className="text-left px-2 py-2.5 font-medium w-14">时长</th>
+                    <th className="text-left px-2 py-2.5 font-medium w-16 whitespace-nowrap">压缩</th>
+                    <th className="text-center px-2 py-2.5 font-medium w-[5.5rem] whitespace-nowrap">质检状态</th>
+                    <th className="text-left px-2 py-2.5 font-medium w-16 whitespace-nowrap">上传</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -290,22 +476,16 @@ export default function TaskDetailPage() {
                     const us = STATUS_BADGE.upload[it.uploadStatus] || ['—', 'text-muted-foreground']
                     return (
                       <tr key={it.id} className="border-t border-border hover:bg-secondary/30 transition-colors">
-                        <td className="px-3 py-2.5 text-muted-foreground">{it.index}</td>
-                        <td className="px-3 py-2.5" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{it.fileName}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground text-xs">{it.collectTime || '—'}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{it.dataSize || '—'}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{it.duration || '—'}</td>
-                        <td className={`px-3 py-2.5 text-xs ${cp[1]}`}>{cp[0]}</td>
-                        <td className={`px-3 py-2.5 text-xs ${us[1]}`}>{us[0]}</td>
-                        <td className="px-3 py-2.5">
-                          <button
-                            onClick={() => setDeleteItemId(it.id)}
-                            className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded hover:bg-secondary"
-                            title="删除"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                        <td className="px-2 py-2.5 text-muted-foreground tabular-nums">{it.index}</td>
+                        <td className="px-3 py-2.5 min-w-0 truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }} title={it.fileName}>{it.fileName}</td>
+                        <td className="px-2 py-2.5 text-muted-foreground text-xs whitespace-nowrap">{it.collectTime || '—'}</td>
+                        <td className="px-2 py-2.5 text-muted-foreground text-xs whitespace-nowrap">{it.dataSize || '—'}</td>
+                        <td className="px-2 py-2.5 text-muted-foreground text-xs whitespace-nowrap">{it.duration || '—'}</td>
+                        <td className={`px-2 py-2.5 text-xs whitespace-nowrap ${cp[1]}`}>{cp[0]}</td>
+                        <td className="px-2 py-2.5 whitespace-nowrap text-center">
+                          <QualityBadge item={it} onInspect={setQualityDrawerItem} />
                         </td>
+                        <td className={`px-2 py-2.5 text-xs whitespace-nowrap ${us[1]}`}>{us[0]}</td>
                       </tr>
                     )
                   })}
@@ -460,19 +640,7 @@ export default function TaskDetailPage() {
         )
       })()}
 
-      {/* Delete confirmation */}
-      {deleteItemId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-card border border-border rounded-xl p-6 max-w-sm w-full mx-4">
-            <h3 className="mb-3 text-destructive">删除文件</h3>
-            <p className="text-sm text-muted-foreground mb-6">确认删除该采集文件？此操作不可恢复。</p>
-            <div className="flex gap-2.5 justify-end">
-              <button onClick={() => setDeleteItemId(null)} className="px-5 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] transition-colors text-sm font-medium border border-border">取消</button>
-              <button onClick={deleteItem} className="px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 active:scale-[0.98] transition-colors text-sm font-medium">确认删除</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <QualityDetailDrawer item={qualityDrawerItem} onClose={() => setQualityDrawerItem(null)} />
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg bg-card border border-border text-sm shadow-2xl">

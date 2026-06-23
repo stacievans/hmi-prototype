@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../state/AppContext.jsx'
 import {
   ArrowLeft, Play, LoaderCircle, ChevronDown, ChevronRight,
-  Hand, Glasses, Check, TriangleAlert, Video, Maximize2, Eye, EyeOff, Circle,
+  Hand, Glasses, Check, TriangleAlert, Video, Maximize2, Eye, EyeOff, Circle, HardDrive,
 } from 'lucide-react'
 import GripperTimeDock from '../components/charts/GripperTimeDock.jsx'
 
@@ -23,9 +23,9 @@ export default function WorkstationPage() {
   const {
     tasks, controlState, teleopMode, inputSource, setInputSource,
     takeControl, releaseControl, setRecordingState, recordingState,
-    exportRecordingCSV, setTasks,
+    exportRecordingCSV, setTasks, storage,
     connectedDevices, easingProgress,
-    setRecordingDisplayState, setPaused,
+    beginLiveRecordingDisplay, finishRecordingDisplay,
   } = useApp()
   const task = tasks.find((t) => t.id === taskId)
 
@@ -44,6 +44,7 @@ export default function WorkstationPage() {
   const [currentStep, setCurrentStep] = useState(0)
   const [enabledCams, setEnabledCams] = useState({ head: true, chest: true, left: true, right: true })
   const [fullscreenCam, setFullscreenCam] = useState(null)
+  const [pendingLeavePath, setPendingLeavePath] = useState(null)
 
   // Tick recording time
   useEffect(() => {
@@ -111,10 +112,9 @@ export default function WorkstationPage() {
   }, [recordingState])
 
   const startRecord = () => {
+    beginLiveRecordingDisplay()
     setRecordingState('recording')
     setElapsed(0)
-    setRecordingDisplayState('live')
-    setPaused(false)
   }
   const stopRecord = () => {
     if (elapsed > 0 && elapsed < MIN_DURATION) {
@@ -150,9 +150,7 @@ export default function WorkstationPage() {
     } else if (cancelled) {
       flashToast('已取消本次录制')
     }
-    setRecordingState('idle')
-    setRecordingDisplayState('frozen')  // 切换到 frozen：曲线冻结在最后 10s
-    setPaused(true)                     // 暂停仿真器，history 不再增长
+    finishRecordingDisplay()
     setElapsed(0)
     setShowWarnShort(false)
     setShowWarnLong(false)
@@ -175,19 +173,30 @@ export default function WorkstationPage() {
     startRecord()
   }
 
-  const handleBack = () => {
+  const requestLeave = (path) => {
     if (controlState === 'controlling' || recordingState === 'recording') {
+      setPendingLeavePath(path)
       setShowLeaveConfirm(true)
     } else {
-      nav(`/collection/task/${taskId}`)
+      nav(path)
     }
+  }
+
+  const handleBack = () => {
+    requestLeave(`/collection/task/${taskId}`)
   }
 
   const confirmLeave = () => {
     releaseControl()
     setRecordingState('idle')
     setShowLeaveConfirm(false)
-    nav(`/collection/task/${taskId}`)
+    nav(pendingLeavePath ?? `/collection/task/${taskId}`)
+    setPendingLeavePath(null)
+  }
+
+  const cancelLeave = () => {
+    setShowLeaveConfirm(false)
+    setPendingLeavePath(null)
   }
 
   const flashToast = (msg) => {
@@ -219,75 +228,82 @@ export default function WorkstationPage() {
             <ArrowLeft size={16} />
             返回
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <StorageStatusBadge storage={storage} onNavigate={() => requestLeave('/anomaly')} />
             {recordingState === 'recording' && (
-              <div className="flex items-center gap-1.5 text-destructive text-xs font-medium">
+              <div className="flex items-center gap-1.5 text-destructive text-xs font-medium shrink-0">
                 <span className="w-2 h-2 rounded-full bg-destructive animate-pulse-dot" />
                 REC
               </div>
             )}
-            <span className="text-sm font-medium">{task.name}</span>
-            <span className="text-xs text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{task.taskId}</span>
+            <span className="text-sm font-medium truncate max-w-[12rem] sm:max-w-none">{task.name}</span>
+            <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{task.taskId}</span>
           </div>
         </div>
 
-        {/* Main row: cameras (2/3) + side panel (1/3) */}
+        {/* Main row: left = cameras + gripper dock; right = task panel */}
         <div className="flex-1 grid grid-cols-3 gap-3 min-h-0">
-          {/* Camera area: 2x2 grid, fills 2/3 width */}
-          <div className="col-span-2 rounded-md border border-border bg-[#0a0d12] relative overflow-hidden flex flex-col">
-            {/* Camera toggles */}
-            <div className="absolute top-2.5 left-2.5 z-10 flex gap-1">
-              {CAMS.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => setEnabledCams((m) => ({ ...m, [c.id]: !m[c.id] }))}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors ${
-                    enabledCams[c.id]
-                      ? 'bg-primary/15 text-primary border border-primary/30'
-                      : 'bg-secondary/80 text-muted-foreground border border-border'
-                  }`}
-                >
-                  {enabledCams[c.id] ? <Eye size={11} /> : <EyeOff size={11} />}
-                  {c.label}
-                </button>
-              ))}
+          {/* Left column: camera grid + gripper curves (2/3 width) */}
+          <div className="col-span-2 flex flex-col gap-3 min-h-0">
+            <div className="flex-1 min-h-0 rounded-md border border-border bg-[#0a0d12] relative overflow-hidden flex flex-col">
+              {/* Camera toggles */}
+              <div className="absolute top-2.5 left-2.5 z-10 flex gap-1">
+                {CAMS.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setEnabledCams((m) => ({ ...m, [c.id]: !m[c.id] }))}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] transition-colors ${
+                      enabledCams[c.id]
+                        ? 'bg-primary/15 text-primary border border-primary/30'
+                        : 'bg-secondary/80 text-muted-foreground border border-border'
+                    }`}
+                  >
+                    {enabledCams[c.id] ? <Eye size={11} /> : <EyeOff size={11} />}
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              {/* Camera grid */}
+              <div className="flex-1 min-h-0 p-1.5 pt-12">
+                {fsCam ? (
+                  <CameraTile cam={fsCam} recording={recordingState === 'recording'} large />
+                ) : enabledList.length === 0 ? (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">所有相机已关闭</div>
+                ) : (
+                  <div className={`w-full h-full grid gap-1.5 ${enabledList.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {enabledList.map((c) => (
+                      <div key={c.id} className="relative group rounded overflow-hidden">
+                        <CameraTile cam={c} recording={recordingState === 'recording'} />
+                        <button
+                          onClick={() => setFullscreenCam(c.id)}
+                          className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-black/60 text-white"
+                        >
+                          <Maximize2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {fsCam && (
+                  <button
+                    onClick={() => setFullscreenCam(null)}
+                    className="absolute bottom-2.5 right-2.5 z-10 px-2.5 py-1 rounded-md bg-secondary/80 text-foreground text-[11px] hover:bg-secondary transition-colors border border-border"
+                  >
+                    退出全屏
+                  </button>
+                )}
+              </div>
             </div>
-            {/* Camera grid */}
-            <div className="flex-1 p-1.5 pt-12">
-              {fsCam ? (
-                <CameraTile cam={fsCam} recording={recordingState === 'recording'} large />
-              ) : enabledList.length === 0 ? (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">所有相机已关闭</div>
-              ) : (
-                <div className={`w-full h-full grid gap-1.5 ${enabledList.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                  {enabledList.map((c) => (
-                    <div key={c.id} className="relative group rounded overflow-hidden">
-                      <CameraTile cam={c} recording={recordingState === 'recording'} />
-                      <button
-                        onClick={() => setFullscreenCam(c.id)}
-                        className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md bg-black/60 text-white"
-                      >
-                        <Maximize2 size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {fsCam && (
-                <button
-                  onClick={() => setFullscreenCam(null)}
-                  className="absolute bottom-2.5 right-2.5 z-10 px-2.5 py-1 rounded-md bg-secondary/80 text-foreground text-[11px] hover:bg-secondary transition-colors border border-border"
-                >
-                  退出全屏
-                </button>
-              )}
+
+            <div className="shrink-0 min-h-0">
+              <GripperTimeDock />
             </div>
           </div>
 
-          {/* Right side panel: progress / task details / collection timer / input source / teleop */}
-          <div className="rounded-md border border-border bg-[#0d1117] overflow-y-auto flex flex-col">
+          {/* Right column: progress / task details / collection timer / input source / teleop */}
+          <div className="col-span-1 min-h-0 rounded-md border border-border bg-[#0d1117] flex flex-col overflow-hidden">
             {/* Current progress */}
-            <div className="p-3 border-b border-border">
+            <div className="p-3 border-b border-border shrink-0">
               <h4 className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider">当前进度</h4>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl text-primary" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{ep.toString().padStart(2, '0')}</span>
@@ -303,16 +319,16 @@ export default function WorkstationPage() {
             </div>
 
             {/* Task details (collapsible) */}
-            <div className="border-b border-border">
+            <div className="border-b border-border flex-1 min-h-0 flex flex-col overflow-hidden">
               <button
                 onClick={() => setShowTaskDetails((v) => !v)}
-                className="w-full flex items-center justify-between p-3 hover:bg-secondary/30 transition-colors"
+                className="w-full flex items-center justify-between p-3 hover:bg-secondary/30 transition-colors shrink-0"
               >
                 <h4 className="text-[10px] text-muted-foreground uppercase tracking-wider">任务详情</h4>
                 {showTaskDetails ? <ChevronDown size={12} className="text-muted-foreground" /> : <ChevronRight size={12} className="text-muted-foreground" />}
               </button>
               {showTaskDetails && (
-                <div className="px-3 pb-3 text-xs space-y-2.5">
+                <div className="px-3 pb-3 text-xs space-y-2.5 overflow-y-auto flex-1 min-h-0">
                   <div>
                     <div className="text-muted-foreground mb-1">初始场景</div>
                     <div className="text-foreground leading-relaxed">{task.initialScene}</div>
@@ -336,7 +352,7 @@ export default function WorkstationPage() {
             </div>
 
             {/* Collection timer */}
-            <div className="p-3 border-b border-border">
+            <div className="p-3 border-b border-border shrink-0">
               <h4 className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider">采集计时</h4>
               <div
                 className={`text-3xl text-center my-2 ${recordingState === 'recording' ? 'text-destructive' : 'text-foreground'}`}
@@ -387,7 +403,7 @@ export default function WorkstationPage() {
             </div>
 
             {/* Footer: input source + teleop control */}
-            <div className="bg-[#010409] mt-auto p-3 space-y-3">
+            <div className="bg-[#010409] p-3 space-y-3 shrink-0">
               <div>
                 <h4 className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider">输入源</h4>
                 <div className="grid grid-cols-2 gap-2">
@@ -459,11 +475,6 @@ export default function WorkstationPage() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Gripper + force curves dock with scrubber (fixed 10s window) */}
-        <div className="shrink-0">
-          <GripperTimeDock />
         </div>
       </div>
 
@@ -556,12 +567,12 @@ export default function WorkstationPage() {
             <h3 className="mb-3">离开确认</h3>
             <p className="text-sm text-muted-foreground mb-6">
               {recordingState === 'recording'
-                ? '当前正在录制中，离开将自动停止录制并释放设备控制。'
-                : '当前处于设备控制中，离开将自动释放控制，设备进入安全停止状态。'}
+                ? '当前正在录制中，离开将中断采集并释放设备控制。'
+                : '当前处于设备控制中，离开将释放控制，设备进入安全停止状态。'}
             </p>
             <div className="flex gap-2.5 justify-end">
               <button
-                onClick={() => setShowLeaveConfirm(false)}
+                onClick={cancelLeave}
                 className="px-5 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
               >
                 取消
@@ -606,6 +617,67 @@ export default function WorkstationPage() {
         </div>
       )}
     </div>
+  )
+}
+
+function StorageStatusBadge({ storage, onNavigate }) {
+  const { usagePct } = storage
+  const level = usagePct >= 90 ? 'critical' : usagePct >= 80 ? 'warning' : 'normal'
+  const isAlert = level !== 'normal'
+  const isCritical = level === 'critical'
+
+  const badgeStyle = {
+    normal: {
+      color: '#8b949e',
+      backgroundColor: 'rgba(33, 38, 45, 0.65)',
+      border: '1px solid rgba(240, 246, 252, 0.12)',
+    },
+    warning: {
+      color: '#d29922',
+      backgroundColor: 'rgba(210, 153, 34, 0.2)',
+      border: '1px solid rgba(210, 153, 34, 0.45)',
+    },
+    critical: {
+      color: '#f85149',
+      backgroundColor: 'rgba(248, 81, 73, 0.22)',
+      border: '1px solid rgba(248, 81, 73, 0.55)',
+      boxShadow: '0 0 0 1px rgba(248, 81, 73, 0.12)',
+    },
+  }[level]
+
+  const content = (
+    <>
+      <HardDrive size={12} className="shrink-0" strokeWidth={2.25} />
+      <span>存储</span>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{usagePct.toFixed(0)}%</span>
+      {isCritical && <TriangleAlert size={10} className="shrink-0" strokeWidth={2.5} />}
+    </>
+  )
+
+  const sharedClass = 'flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold shrink-0'
+
+  if (isAlert) {
+    return (
+      <button
+        type="button"
+        onClick={onNavigate}
+        title={isCritical ? '存储空间严重不足，点击前往清理异常数据' : '存储空间紧张，点击前往清理异常数据'}
+        className={`${sharedClass} transition-opacity hover:opacity-90 active:scale-[0.98]`}
+        style={badgeStyle}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <span
+      title={`本地存储使用率 ${usagePct.toFixed(0)}%`}
+      className={sharedClass}
+      style={badgeStyle}
+    >
+      {content}
+    </span>
   )
 }
 

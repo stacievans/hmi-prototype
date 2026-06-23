@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from 'react'
 
 const AppContext = createContext(null)
 export const useApp = () => useContext(AppContext)
@@ -7,6 +7,7 @@ const initialRobotStatus = {
   ip: '192.168.1.100',
   battery: 78,
   ping: 12,
+  cpuUsage: 45,
   frameRate: 30,
   deviceStatus: {
     arm: 'online',
@@ -24,6 +25,34 @@ const initialSubSystems = [
   { id: 'video', name: '视频流', status: 'running', heartbeat: '5ms', errorCode: '-' },
 ]
 
+/** 机器人本地存储（GB 量级 mock，便于演示清理异常数据后使用率下降） */
+const TOTAL_STORAGE_GB = 50
+/** 系统基础占用：OS、程序等固定 mock */
+const BASE_STORAGE_GB = 8
+
+export function parseDataSizeMB(sizeStr) {
+  if (!sizeStr) return 0
+  const n = parseFloat(String(sizeStr).replace(/[^\d.]/g, ''))
+  return Number.isFinite(n) ? n : 0
+}
+
+function computeStorageBreakdown(tasks) {
+  let processingMB = 0
+  let anomalyMB = 0
+  for (const task of tasks) {
+    for (const item of task.items ?? []) {
+      if (item.collectStatus !== 'done') continue
+      const mb = parseDataSizeMB(item.dataSize)
+      if (item.qualityStatus === 'failed') {
+        anomalyMB += mb
+      } else if (item.uploadStatus !== 'uploaded') {
+        processingMB += mb
+      }
+    }
+  }
+  return { processingMB, anomalyMB }
+}
+
 // File name generator: YYYYMMDD_HHMMSS.h5 offset by `t` minutes
 function fnName(base, t = 0) {
   const r = new Date(base.getTime() + t * 60_000)
@@ -32,6 +61,26 @@ function fnName(base, t = 0) {
 function collectTime(base, t = 0) {
   const r = new Date(base.getTime() + t * 60_000)
   return `${r.getFullYear()}-${String(r.getMonth() + 1).padStart(2, '0')}-${String(r.getDate()).padStart(2, '0')} ${String(r.getHours()).padStart(2, '0')}:${String(r.getMinutes()).padStart(2, '0')}:${String(r.getSeconds()).padStart(2, '0')}`
+}
+
+function localPath(taskId, fileName) {
+  return `/data/robot/real-world/${taskId}/${fileName}`
+}
+
+/**
+ * Task item 数据质量字段（items[] 元素扩展）
+ * - qualityStatus: 'passed' 合格 | 'failed' 异常 | 'warning' 警告 | 'pending' 待检
+ * - anomalyType: '文件异常' | '数据缺失' | '时序异常' | '传感器异常' | null
+ * - anomalyReasons: 异常/警告原因文案数组，无则 []
+ * - localPath: 本地落盘路径，如 /data/robot/real-world/task-001/20260318_093000.h5
+ */
+function itemQuality(overrides = {}) {
+  return {
+    anomalyType: null,
+    anomalyReasons: [],
+    qualityStatus: 'pending',
+    ...overrides,
+  }
 }
 
 const D1 = new Date('2026-03-18T09:30:00')
@@ -55,14 +104,69 @@ const initialTasks = [
     totalItems: 20,
     completedItems: 8,
     items: [
-      { id: 'item-1', index: 1, fileName: fnName(D1, 0),  dataSize: '345.2 MB', duration: '25s', collectTime: collectTime(D1, 0),  compressStatus: 'done', qualityStatus: 'passed', uploadStatus: 'uploaded',   collectStatus: 'done' },
-      { id: 'item-2', index: 2, fileName: fnName(D1, 3),  dataSize: '412.8 MB', duration: '32s', collectTime: collectTime(D1, 3),  compressStatus: 'done', qualityStatus: 'passed', uploadStatus: 'uploaded',   collectStatus: 'done' },
-      { id: 'item-3', index: 3, fileName: fnName(D1, 6),  dataSize: '298.5 MB', duration: '18s', collectTime: collectTime(D1, 6),  compressStatus: 'done', qualityStatus: 'passed', uploadStatus: 'uploaded',   collectStatus: 'done' },
-      { id: 'item-4', index: 4, fileName: fnName(D1, 9),  dataSize: '521.3 MB', duration: '38s', collectTime: collectTime(D1, 9),  compressStatus: 'done', qualityStatus: 'passed', uploadStatus: 'uploaded',   collectStatus: 'done' },
-      { id: 'item-5', index: 5, fileName: fnName(D1, 12), dataSize: '387.9 MB', duration: '29s', collectTime: collectTime(D1, 12), compressStatus: 'done', qualityStatus: 'passed', uploadStatus: 'uploaded',   collectStatus: 'done' },
-      { id: 'item-6', index: 6, fileName: fnName(D1, 15), dataSize: '456.7 MB', duration: '35s', collectTime: collectTime(D1, 15), compressStatus: 'done', qualityStatus: 'passed', uploadStatus: 'uploading',  collectStatus: 'done' },
-      { id: 'item-7', index: 7, fileName: fnName(D1, 18), dataSize: '334.1 MB', duration: '22s', collectTime: collectTime(D1, 18), compressStatus: 'done', qualityStatus: 'checking', uploadStatus: 'pending',  collectStatus: 'done' },
-      { id: 'item-8', index: 8, fileName: fnName(D1, 21), dataSize: '489.6 MB', duration: '31s', collectTime: collectTime(D1, 21), compressStatus: 'compressing', qualityStatus: 'pending', uploadStatus: 'pending', collectStatus: 'done' },
+      (() => { const fileName = fnName(D1, 0); return {
+        id: 'item-1', index: 1, fileName, dataSize: '345.2 MB', duration: '25s', collectTime: collectTime(D1, 0),
+        compressStatus: 'done', uploadStatus: 'uploaded', collectStatus: 'done',
+        localPath: localPath('task-001', fileName),
+        ...itemQuality({ qualityStatus: 'passed' }),
+      } })(),
+      (() => { const fileName = fnName(D1, 3); return {
+        id: 'item-2', index: 2, fileName, dataSize: '5200 MB', duration: '32s', collectTime: collectTime(D1, 3),
+        compressStatus: 'done', uploadStatus: 'pending', collectStatus: 'done',
+        localPath: localPath('task-001', fileName),
+        ...itemQuality({
+          qualityStatus: 'failed',
+          anomalyType: '文件异常',
+          anomalyReasons: ['HDF5 文件头校验失败：magic number 不匹配', '文件大小与元数据记录不一致（期望 5.2 GB，实际 0 B）'],
+        }),
+      } })(),
+      (() => { const fileName = fnName(D1, 6); return {
+        id: 'item-3', index: 3, fileName, dataSize: '298.5 MB', duration: '18s', collectTime: collectTime(D1, 6),
+        compressStatus: 'done', uploadStatus: 'uploaded', collectStatus: 'done',
+        localPath: localPath('task-001', fileName),
+        ...itemQuality({ qualityStatus: 'passed' }),
+      } })(),
+      (() => { const fileName = fnName(D1, 9); return {
+        id: 'item-4', index: 4, fileName, dataSize: '6500 MB', duration: '38s', collectTime: collectTime(D1, 9),
+        compressStatus: 'done', uploadStatus: 'pending', collectStatus: 'done',
+        localPath: localPath('task-001', fileName),
+        ...itemQuality({
+          qualityStatus: 'failed',
+          anomalyType: '时序异常',
+          anomalyReasons: ['帧时间戳不连续：第 412–418 帧间隔超过 200ms', '采集时长与帧数不匹配（声明 38s，有效帧仅 31.2s）'],
+        }),
+      } })(),
+      (() => { const fileName = fnName(D1, 12); return {
+        id: 'item-5', index: 5, fileName, dataSize: '1400 MB', duration: '29s', collectTime: collectTime(D1, 12),
+        compressStatus: 'done', uploadStatus: 'pending', collectStatus: 'done',
+        localPath: localPath('task-001', fileName),
+        ...itemQuality({
+          qualityStatus: 'warning',
+          anomalyReasons: ['关节超限位：左臂2轴超出限位范围'],
+        }),
+      } })(),
+      (() => { const fileName = fnName(D1, 15); return {
+        id: 'item-6', index: 6, fileName, dataSize: '4800 MB', duration: '35s', collectTime: collectTime(D1, 15),
+        compressStatus: 'done', uploadStatus: 'pending', collectStatus: 'done',
+        localPath: localPath('task-001', fileName),
+        ...itemQuality({
+          qualityStatus: 'failed',
+          anomalyType: '传感器异常',
+          anomalyReasons: ['夹爪数据异常：开合度超出合理范围', '六维力传感器 Fx 通道在 12.4s–14.1s 内丢帧'],
+        }),
+      } })(),
+      (() => { const fileName = fnName(D1, 18); return {
+        id: 'item-7', index: 7, fileName, dataSize: '1300 MB', duration: '22s', collectTime: collectTime(D1, 18),
+        compressStatus: 'done', uploadStatus: 'pending', collectStatus: 'done',
+        localPath: localPath('task-001', fileName),
+        ...itemQuality({ qualityStatus: 'pending' }),
+      } })(),
+      (() => { const fileName = fnName(D1, 21); return {
+        id: 'item-8', index: 8, fileName, dataSize: '1400 MB', duration: '31s', collectTime: collectTime(D1, 21),
+        compressStatus: 'compressing', uploadStatus: 'pending', collectStatus: 'done',
+        localPath: localPath('task-001', fileName),
+        ...itemQuality({ qualityStatus: 'pending' }),
+      } })(),
     ],
   },
   {
@@ -83,14 +187,55 @@ const initialTasks = [
     description: '采集厨房场景下的操作数据，包含拿碗、倒水等动作。',
     initialScene: '厨房台面上放置碗和水壶，机械臂处于初始位姿',
     steps: ['从柜中取出碗', '将碗放置于台面', '拿起水壶', '向碗中倒水并放回水壶'],
-    totalItems: 10, completedItems: 10,
-    items: Array.from({ length: 10 }, (_, i) => ({
-      id: `item-k-${i + 1}`, index: i + 1, fileName: fnName(D3, i * 4),
-      dataSize: `${(Math.random() * 400 + 150).toFixed(1)} MB`,
-      duration: `${Math.floor(Math.random() * 25 + 8)}s`,
-      collectTime: collectTime(D3, i * 4),
-      compressStatus: 'done', qualityStatus: 'passed', uploadStatus: 'uploaded', collectStatus: 'done',
-    })),
+    totalItems: 12, completedItems: 12,
+    items: [
+      ...Array.from({ length: 10 }, (_, i) => {
+        const fileName = fnName(D3, i * 4)
+        return {
+          id: `item-k-${i + 1}`, index: i + 1, fileName,
+          dataSize: `${(Math.random() * 400 + 150).toFixed(1)} MB`,
+          duration: `${Math.floor(Math.random() * 25 + 8)}s`,
+          collectTime: collectTime(D3, i * 4),
+          compressStatus: 'done', uploadStatus: 'uploaded', collectStatus: 'done',
+          localPath: localPath('task-003', fileName),
+          ...itemQuality({ qualityStatus: 'passed' }),
+        }
+      }),
+      (() => {
+        const fileName = fnName(D3, 44)
+        return {
+          id: 'item-k-f1', index: 11, fileName,
+          dataSize: '4200 MB', duration: '21s', collectTime: collectTime(D3, 44),
+          compressStatus: 'done', uploadStatus: 'pending', collectStatus: 'done',
+          localPath: localPath('task-003', fileName),
+          ...itemQuality({
+            qualityStatus: 'failed',
+            anomalyType: '数据缺失',
+            anomalyReasons: [
+              '左腕相机话题 /camera/left 无数据记录',
+              'joint_states 序列缺失：第 1200–1450 帧为空',
+            ],
+          }),
+        }
+      })(),
+      (() => {
+        const fileName = fnName(D3, 50)
+        return {
+          id: 'item-k-f2', index: 12, fileName,
+          dataSize: '3800 MB', duration: '16s', collectTime: collectTime(D3, 50),
+          compressStatus: 'done', uploadStatus: 'pending', collectStatus: 'done',
+          localPath: localPath('task-003', fileName),
+          ...itemQuality({
+            qualityStatus: 'failed',
+            anomalyType: '数据缺失',
+            anomalyReasons: [
+              '胸部深度图 /depth/chest 整段缺失（0 帧）',
+              '末端六维力 Fz 通道在采集全程无有效读数',
+            ],
+          }),
+        }
+      })(),
+    ],
   },
   {
     id: 'task-004', taskId: 'T-20260320-004',
@@ -120,14 +265,55 @@ const initialTasks = [
     description: '采集折叠不同类型衣物的操作数据，包含T恤、毛巾等。',
     initialScene: '桌面上平铺一件未折叠的衣物',
     steps: ['双臂抓取衣物两侧', '对折衣物中线', '再次对折', '整理边缘放置整齐'],
-    totalItems: 25, completedItems: 3,
-    items: Array.from({ length: 3 }, (_, i) => ({
-      id: `item-f-${i + 1}`, index: i + 1, fileName: fnName(D2, i * 5),
-      dataSize: `${(Math.random() * 450 + 250).toFixed(1)} MB`,
-      duration: `${Math.floor(Math.random() * 40 + 15)}s`,
-      collectTime: collectTime(D2, i * 5),
-      compressStatus: 'done', qualityStatus: 'passed', uploadStatus: 'uploaded', collectStatus: 'done',
-    })),
+    totalItems: 25, completedItems: 5,
+    items: [
+      ...Array.from({ length: 3 }, (_, i) => {
+        const fileName = fnName(D2, i * 5)
+        return {
+          id: `item-f-${i + 1}`, index: i + 1, fileName,
+          dataSize: `${(Math.random() * 450 + 250).toFixed(1)} MB`,
+          duration: `${Math.floor(Math.random() * 40 + 15)}s`,
+          collectTime: collectTime(D2, i * 5),
+          compressStatus: 'done', uploadStatus: 'uploaded', collectStatus: 'done',
+          localPath: localPath('task-006', fileName),
+          ...itemQuality({ qualityStatus: 'passed' }),
+        }
+      }),
+      (() => {
+        const fileName = fnName(D2, 18)
+        return {
+          id: 'item-f-x1', index: 4, fileName,
+          dataSize: '6800 MB', duration: '36s', collectTime: collectTime(D2, 18),
+          compressStatus: 'done', uploadStatus: 'pending', collectStatus: 'done',
+          localPath: localPath('task-006', fileName),
+          ...itemQuality({
+            qualityStatus: 'failed',
+            anomalyType: '文件异常',
+            anomalyReasons: [
+              'HDF5 数据集 /observations/qpos 损坏，无法读取',
+              '文件尾部校验和不匹配，疑似写入中断',
+            ],
+          }),
+        }
+      })(),
+      (() => {
+        const fileName = fnName(D2, 24)
+        return {
+          id: 'item-f-x2', index: 5, fileName,
+          dataSize: '3516 MB', duration: '28s', collectTime: collectTime(D2, 24),
+          compressStatus: 'done', uploadStatus: 'pending', collectStatus: 'done',
+          localPath: localPath('task-006', fileName),
+          ...itemQuality({
+            qualityStatus: 'failed',
+            anomalyType: '时序异常',
+            anomalyReasons: [
+              '多相机帧未对齐：头部相机领先胸部相机 3 帧',
+              '采集时钟回跳：t=18.2s 处时间戳倒退 120ms',
+            ],
+          }),
+        }
+      })(),
+    ],
   },
   {
     id: 'task-007', taskId: 'T-20260323-007',
@@ -228,13 +414,18 @@ const initialTasks = [
     initialScene: '桌面上放置多支带盖签字笔',
     steps: ['一手握住笔身', '另一手握住笔盖', '向外拔出笔盖', '反向盖回笔盖'],
     totalItems: 10, completedItems: 5,
-    items: Array.from({ length: 5 }, (_, i) => ({
-      id: `item-p-${i + 1}`, index: i + 1, fileName: fnName(D2, 20 + i * 4),
-      dataSize: `${(Math.random() * 320 + 180).toFixed(1)} MB`,
-      duration: `${Math.floor(Math.random() * 22 + 10)}s`,
-      collectTime: collectTime(D2, 20 + i * 4),
-      compressStatus: 'done', qualityStatus: 'passed', uploadStatus: 'uploaded', collectStatus: 'done',
-    })),
+    items: Array.from({ length: 5 }, (_, i) => {
+      const fileName = fnName(D2, 20 + i * 4)
+      return {
+        id: `item-p-${i + 1}`, index: i + 1, fileName,
+        dataSize: `${(Math.random() * 320 + 180).toFixed(1)} MB`,
+        duration: `${Math.floor(Math.random() * 22 + 10)}s`,
+        collectTime: collectTime(D2, 20 + i * 4),
+        compressStatus: 'done', uploadStatus: 'uploaded', collectStatus: 'done',
+        localPath: localPath('task-016', fileName),
+        ...itemQuality({ qualityStatus: 'passed' }),
+      }
+    }),
   },
   {
     id: 'task-017', taskId: 'T-20260402-017',
@@ -295,13 +486,18 @@ const initialTasks = [
     initialScene: '桌面上放置锁屏状态的手机',
     steps: ['定位屏幕底部', '手指接触屏幕', '向上滑动', '抬起手指'],
     totalItems: 6, completedItems: 6,
-    items: Array.from({ length: 6 }, (_, i) => ({
-      id: `item-m-${i + 1}`, index: i + 1, fileName: fnName(D3, 50 + i * 3),
-      dataSize: `${(Math.random() * 200 + 90).toFixed(1)} MB`,
-      duration: `${Math.floor(Math.random() * 12 + 5)}s`,
-      collectTime: collectTime(D3, 50 + i * 3),
-      compressStatus: 'done', qualityStatus: 'passed', uploadStatus: 'uploaded', collectStatus: 'done',
-    })),
+    items: Array.from({ length: 6 }, (_, i) => {
+      const fileName = fnName(D3, 50 + i * 3)
+      return {
+        id: `item-m-${i + 1}`, index: i + 1, fileName,
+        dataSize: `${(Math.random() * 200 + 90).toFixed(1)} MB`,
+        duration: `${Math.floor(Math.random() * 12 + 5)}s`,
+        collectTime: collectTime(D3, 50 + i * 3),
+        compressStatus: 'done', uploadStatus: 'uploaded', collectStatus: 'done',
+        localPath: localPath('task-022', fileName),
+        ...itemQuality({ qualityStatus: 'passed' }),
+      }
+    }),
   },
 ]
 
@@ -336,6 +532,28 @@ export function AppProvider({ children }) {
   const [robotStatus, setRobotStatus] = useState(initialRobotStatus)
   const [subSystems, setSubSystems] = useState(initialSubSystems)
   const [tasks, setTasks] = useState(initialTasks)
+
+  const storage = useMemo(() => {
+    const { processingMB, anomalyMB } = computeStorageBreakdown(tasks)
+    const baseGB = BASE_STORAGE_GB
+    const processingGB = processingMB / 1024
+    const anomalyGB = anomalyMB / 1024
+    const usedGB = baseGB + processingGB + anomalyGB
+    const totalGB = TOTAL_STORAGE_GB
+    const freeGB = Math.max(0, totalGB - usedGB)
+    const usagePct = totalGB > 0 ? (usedGB / totalGB) * 100 : 0
+    return {
+      totalGB,
+      baseGB,
+      processingGB,
+      anomalyGB,
+      usedGB,
+      freeGB,
+      usagePct,
+      processingMB,
+      anomalyMB,
+    }
+  }, [tasks])
   const [connectedDevices, setConnectedDevices] = useState({ exoskeleton: true, vr: false })
   const [multipleDevicesConnected] = useState(true)
   const [controlState, setControlState] = useState('idle') // idle | controlling
@@ -354,6 +572,7 @@ export function AppProvider({ children }) {
   // Real-time data
   const [liveData, setLiveData] = useState(() => initialSample(0))
   const [history, setHistory] = useState([])
+  const [frozenHistory, setFrozenHistory] = useState([])
   const [paused, setPaused] = useState(false)
   const recordingBuffer = useRef([])   // samples saved while recording
   const replayTimer = useRef(0)
@@ -391,12 +610,13 @@ export function AppProvider({ children }) {
     }
   }, [controlState, teleopMode, easingProgress])
 
-  // Real-time data tick (30Hz). When paused, the curve freezes but the chart still draws.
+  // Real-time data tick (30Hz). Frozen display keeps the last frame; pause skips live ticks.
   useEffect(() => {
-    if (paused && recordingState !== 'replaying') return
     const interval = 1000 / SAMPLE_HZ
 
     const t = setInterval(() => {
+      if (recordingDisplayState === 'frozen') return
+
       if (recordingState === 'replaying') {
         replayTimer.current += interval / 1000
         const rt = replayTimer.current
@@ -421,6 +641,8 @@ export function AppProvider({ children }) {
         return
       }
 
+      if (paused) return
+
       const tSec = (Date.now() - startedAt.current) / 1000
       const sample = initialSample(tSec)
       setLiveData(sample)
@@ -436,7 +658,7 @@ export function AppProvider({ children }) {
       }
     }, interval)
     return () => clearInterval(t)
-  }, [paused, recordingState])
+  }, [paused, recordingState, recordingDisplayState])
 
   const startReplay = useCallback(() => {
     if (recordingBuffer.current.length === 0) return
@@ -519,9 +741,29 @@ export function AppProvider({ children }) {
     recordingBuffer.current = []
   }, [])
 
+  const beginLiveRecordingDisplay = useCallback(() => {
+    setFrozenHistory([])
+    setRecordingDisplayState('live')
+    setPaused(false)
+  }, [])
+
+  const finishRecordingDisplay = useCallback(() => {
+    const snapshot = recordingBuffer.current.map((r) => ({
+      t: r.t * 1000,
+      joints: r.joints,
+      force: r.force,
+      gripper: r.gripper,
+    }))
+    setFrozenHistory(snapshot)
+    setRecordingState('idle')
+    setRecordingDisplayState('frozen')
+    setPaused(true)
+  }, [])
+
   const value = {
     robotStatus, setRobotStatus,
     subSystems, setSubSystems, toggleSubSystem,
+    storage,
     tasks, setTasks,
     connectedDevices, setConnectedDevices,
     multipleDevicesConnected,
@@ -538,8 +780,9 @@ export function AppProvider({ children }) {
     takeControl, releaseControl, switchToFollow,
     login, logout,
     // Real-time data
-    liveData, history, paused, setPaused,
+    liveData, history, frozenHistory, paused, setPaused,
     exportRecordingCSV, clearRecordingBuffer,
+    beginLiveRecordingDisplay, finishRecordingDisplay,
     recordingBufferSize: () => recordingBuffer.current.length,
     startReplay, stopReplay,
     // Exposed definitions
