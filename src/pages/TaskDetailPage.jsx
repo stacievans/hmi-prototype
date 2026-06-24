@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../state/AppContext.jsx'
+import { CollectProgressBar } from '../components/CollectProgressBar.jsx'
 import { ArrowLeft, Archive, Send, Play, ArchiveRestore, LoaderCircle, MonitorPlay, ChevronLeft, ChevronRight, TriangleAlert, X, Info } from 'lucide-react'
 
 const COMPRESS_OPTS = [
@@ -303,7 +304,6 @@ export default function TaskDetailPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const list = filtered.slice((page - 1) * pageSize, page * pageSize)
-  const pct = task.totalItems > 0 ? (task.completedItems / task.totalItems) * 100 : 0
   const canSubmit = task.items.length > 0 && task.completedItems === task.totalItems
 
   return (
@@ -407,14 +407,7 @@ export default function TaskDetailPage() {
               </div>
             )}
           </div>
-          <div className="mt-4 flex items-center gap-3">
-            <div className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
-              <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
-            </div>
-            <span className="text-xs text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-              {task.completedItems}/{task.totalItems}
-            </span>
-          </div>
+          <CollectProgressBar task={task} />
         </div>
 
         <div className="px-6 py-3 border-b border-border shrink-0 flex items-center gap-3 justify-end text-xs">

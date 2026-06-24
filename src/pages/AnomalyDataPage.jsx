@@ -7,6 +7,25 @@ import {
 
 const ANOMALY_TYPES = ['文件异常', '数据缺失', '时序异常', '传感器异常']
 
+/** 异常类型 → 分段色条颜色（与质检红/黄/绿、存储空间条区分，饱和度适中） */
+const ANOMALY_TYPE_COLORS = {
+  '文件异常': '#79c0ff',
+  '数据缺失': '#a371f7',
+  '时序异常': '#56d4dd',
+  '传感器异常': '#db6d9c',
+}
+
+const ANOMALY_TYPE_FALLBACK_COLOR = '#8b949e'
+
+function getAnomalyTypeColor(type) {
+  return ANOMALY_TYPE_COLORS[type] ?? ANOMALY_TYPE_FALLBACK_COLOR
+}
+
+function anomalySegmentPct(count, total) {
+  if (total <= 0 || count <= 0) return 0
+  return Math.min(100, (count / total) * 100)
+}
+
 const TYPE_OPTS = [
   { value: 'all', label: '全部异常类型' },
   ...ANOMALY_TYPES.map((t) => ({ value: t, label: t })),
@@ -238,7 +257,7 @@ export default function AnomalyDataPage() {
         </div>
 
         <div className="px-6 py-4 space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
             <StatCard
               icon={<FileWarning size={16} className="text-destructive" />}
               label="异常数据总条数"
@@ -251,18 +270,8 @@ export default function AnomalyDataPage() {
               value={formatStorageGB(storage.anomalyMB)}
               mono
             />
-            <div className="p-3.5 rounded-md bg-card border border-border card-depth lg:col-span-1">
-              <div className="text-xs text-muted-foreground mb-2">异常类型分布</div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-                {ANOMALY_TYPES.map((t) => (
-                  <div key={t} className="flex justify-between gap-2">
-                    <span className="text-muted-foreground truncate">{t}</span>
-                    <span className="text-foreground shrink-0" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                      {overview.byType[t]} 条
-                    </span>
-                  </div>
-                ))}
-              </div>
+            <div className="lg:col-span-2 min-w-0">
+              <AnomalyTypeDistributionCard byType={overview.byType} total={overview.count} />
             </div>
           </div>
 
@@ -452,6 +461,80 @@ export default function AnomalyDataPage() {
           {toast.msg}
         </div>
       )}
+    </div>
+  )
+}
+
+function AnomalyTypeLegendItem({ color, type, count, pct }) {
+  return (
+    <span className="inline-flex items-center gap-1 min-w-0 shrink">
+      <span
+        className="w-2 h-2 rounded-sm shrink-0 border border-border/40"
+        style={{ backgroundColor: color }}
+      />
+      <span className="text-muted-foreground truncate">{type}</span>
+      <span className="text-foreground whitespace-nowrap" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+        {count}条·{pct}%
+      </span>
+    </span>
+  )
+}
+
+function AnomalyTypeDistributionCard({ byType, total }) {
+  const segments = useMemo(() => {
+    if (total <= 0) return []
+    return ANOMALY_TYPES
+      .map((type) => ({
+        type,
+        count: byType[type] ?? 0,
+        color: getAnomalyTypeColor(type),
+      }))
+      .filter((seg) => seg.count > 0)
+  }, [byType, total])
+
+  const ariaLabel = segments.length > 0
+    ? segments.map((s) => `${s.type} ${s.count} 条`).join('，')
+    : '暂无异常类型分布'
+
+  return (
+    <div className="p-3.5 rounded-md bg-card border border-border card-depth h-full">
+      <div className="text-xs text-muted-foreground mb-3">异常类型分布</div>
+
+      <div
+        className="w-full h-3 rounded-full bg-secondary overflow-hidden mb-2.5 flex"
+        role="img"
+        aria-label={ariaLabel}
+      >
+        {segments.map((seg, index) => (
+          <div
+            key={seg.type}
+            className={`h-full shrink-0 transition-all duration-300 ${
+              index < segments.length - 1 ? 'border-r border-background/30' : ''
+            }`}
+            style={{
+              width: `${anomalySegmentPct(seg.count, total)}%`,
+              backgroundColor: seg.color,
+            }}
+            title={`${seg.type} ${seg.count} 条 (${anomalySegmentPct(seg.count, total).toFixed(0)}%)`}
+          />
+        ))}
+      </div>
+
+      <div className="flex flex-nowrap items-center justify-between gap-x-2 text-[11px] w-full overflow-hidden">
+        {segments.length > 0 ? (
+          segments.map((seg) => (
+            <AnomalyTypeLegendItem
+              key={seg.type}
+              color={seg.color}
+              type={seg.type}
+              count={seg.count}
+              pct={anomalySegmentPct(seg.count, total).toFixed(0)}
+            />
+          ))
+        ) : (
+          <span className="text-muted-foreground text-xs">暂无异常数据</span>
+        )}
+      </div>
     </div>
   )
 }

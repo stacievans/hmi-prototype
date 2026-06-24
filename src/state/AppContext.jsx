@@ -70,7 +70,7 @@ function localPath(taskId, fileName) {
 /**
  * Task item 数据质量字段（items[] 元素扩展）
  * - qualityStatus: 'passed' 合格 | 'failed' 异常 | 'warning' 警告 | 'pending' 待检
- * - anomalyType: '文件异常' | '数据缺失' | '时序异常' | '传感器异常' | null
+ * - anomalyType: '文件异常' | '数据缺失' | '时序异常' | '传感器异常' | '警告类' | null
  * - anomalyReasons: 异常/警告原因文案数组，无则 []
  * - localPath: 本地落盘路径，如 /data/robot/real-world/task-001/20260318_093000.h5
  */
@@ -117,7 +117,7 @@ const initialTasks = [
         ...itemQuality({
           qualityStatus: 'failed',
           anomalyType: '文件异常',
-          anomalyReasons: ['HDF5 文件头校验失败：magic number 不匹配', '文件大小与元数据记录不一致（期望 5.2 GB，实际 0 B）'],
+          anomalyReasons: ['无法解析', '文件为空'],
         }),
       } })(),
       (() => { const fileName = fnName(D1, 6); return {
@@ -133,7 +133,7 @@ const initialTasks = [
         ...itemQuality({
           qualityStatus: 'failed',
           anomalyType: '时序异常',
-          anomalyReasons: ['帧时间戳不连续：第 412–418 帧间隔超过 200ms', '采集时长与帧数不匹配（声明 38s，有效帧仅 31.2s）'],
+          anomalyReasons: ['数据断帧：存在采集卡顿/丢帧', '时间戳异常：数值非法或非递增'],
         }),
       } })(),
       (() => { const fileName = fnName(D1, 12); return {
@@ -142,7 +142,8 @@ const initialTasks = [
         localPath: localPath('task-001', fileName),
         ...itemQuality({
           qualityStatus: 'warning',
-          anomalyReasons: ['关节超限位：左臂2轴超出限位范围'],
+          anomalyType: '警告类',
+          anomalyReasons: ['关节超限位时间段及占比'],
         }),
       } })(),
       (() => { const fileName = fnName(D1, 15); return {
@@ -152,7 +153,7 @@ const initialTasks = [
         ...itemQuality({
           qualityStatus: 'failed',
           anomalyType: '传感器异常',
-          anomalyReasons: ['夹爪数据异常：开合度超出合理范围', '六维力传感器 Fx 通道在 12.4s–14.1s 内丢帧'],
+          anomalyReasons: ['夹爪数据异常：开合度/力值超出合理范围'],
         }),
       } })(),
       (() => { const fileName = fnName(D1, 18); return {
@@ -212,8 +213,8 @@ const initialTasks = [
             qualityStatus: 'failed',
             anomalyType: '数据缺失',
             anomalyReasons: [
-              '左腕相机话题 /camera/left 无数据记录',
-              'joint_states 序列缺失：第 1200–1450 帧为空',
+              '时间戳记录缺失',
+              '帧率不达标：低于29fps',
             ],
           }),
         }
@@ -227,10 +228,10 @@ const initialTasks = [
           localPath: localPath('task-003', fileName),
           ...itemQuality({
             qualityStatus: 'failed',
-            anomalyType: '数据缺失',
+            anomalyType: '文件异常',
             anomalyReasons: [
-              '胸部深度图 /depth/chest 整段缺失（0 帧）',
-              '末端六维力 Fz 通道在采集全程无有效读数',
+              '缺少关键通道：/depth/chest',
+              '缺少关键通道：/force/torque/fz',
             ],
           }),
         }
@@ -290,8 +291,8 @@ const initialTasks = [
             qualityStatus: 'failed',
             anomalyType: '文件异常',
             anomalyReasons: [
-              'HDF5 数据集 /observations/qpos 损坏，无法读取',
-              '文件尾部校验和不匹配，疑似写入中断',
+              '无法解析',
+              '缺少关键通道：/observations/qpos',
             ],
           }),
         }
@@ -307,8 +308,8 @@ const initialTasks = [
             qualityStatus: 'failed',
             anomalyType: '时序异常',
             anomalyReasons: [
-              '多相机帧未对齐：头部相机领先胸部相机 3 帧',
-              '采集时钟回跳：t=18.2s 处时间戳倒退 120ms',
+              '检测到重复帧：疑似补帧',
+              '时间戳异常：数值非法或非递增',
             ],
           }),
         }
@@ -568,6 +569,7 @@ export function AppProvider({ children }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userName, setUserName] = useState('')
   const [user, setUser] = useState({ name: '' })
+  const [appToast, setAppToast] = useState(null)
 
   // Real-time data
   const [liveData, setLiveData] = useState(() => initialSample(0))
@@ -680,10 +682,31 @@ export function AppProvider({ children }) {
   }, [inputSource])
 
   const releaseControl = useCallback(() => {
+    const wasRecording = recordingState === 'recording'
+    if (wasRecording) {
+      recordingBuffer.current = []
+      setFrozenHistory([])
+      setRecordingDisplayState('hidden')
+      setPaused(false)
+    }
     setControlState('idle')
-    setTeleopMode('easing')
+    setTeleopMode('idle')
     setEasingProgress(0)
     setRecordingState('idle')
+    return wasRecording
+  }, [recordingState])
+
+  const abortRecordingSession = useCallback(() => {
+    recordingBuffer.current = []
+    setFrozenHistory([])
+    setRecordingState('idle')
+    setRecordingDisplayState('hidden')
+    setPaused(false)
+  }, [])
+
+  const showAppToast = useCallback((msg, duration = 2800) => {
+    setAppToast({ msg, id: Date.now() })
+    setTimeout(() => setAppToast(null), duration)
   }, [])
 
   const switchToFollow = useCallback(() => {
@@ -779,10 +802,11 @@ export function AppProvider({ children }) {
     user,
     takeControl, releaseControl, switchToFollow,
     login, logout,
+    appToast, showAppToast,
     // Real-time data
     liveData, history, frozenHistory, paused, setPaused,
     exportRecordingCSV, clearRecordingBuffer,
-    beginLiveRecordingDisplay, finishRecordingDisplay,
+    beginLiveRecordingDisplay, finishRecordingDisplay, abortRecordingSession,
     recordingBufferSize: () => recordingBuffer.current.length,
     startReplay, stopReplay,
     // Exposed definitions

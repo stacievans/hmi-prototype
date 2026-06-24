@@ -29,17 +29,10 @@ export default function DevicesPage() {
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6 w-full min-w-0">
       <BlockPanel icon={<Cpu size={18} className="text-primary" />} title="机器人本体">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card icon={<Wifi size={14} className="text-primary" />} label="IP 地址" value={robotStatus.ip} mono />
           <Card icon={<Battery size={14} className="text-primary" />} label="电量" value={`${robotStatus.battery}%`} mono />
           <Card icon={<Circle size={14} className="text-success fill-success" />} label="心跳" value={`${robotStatus.ping} ms`} mono />
-          <Card
-            icon={<Cpu size={14} className={robotStatus.cpuUsage > 80 ? 'text-warning' : 'text-primary'} />}
-            label="CPU 占用率"
-            value={`${robotStatus.cpuUsage}%`}
-            mono
-            valueClassName={robotStatus.cpuUsage > 80 ? 'text-warning' : ''}
-          />
         </div>
 
         <StorageSection storage={storage} />

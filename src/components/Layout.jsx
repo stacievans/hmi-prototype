@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { controlState, recordingState, releaseControl } = useApp()
+  const { controlState, recordingState, releaseControl, appToast, showAppToast } = useApp()
   const [pending, setPending] = useState(null) // pending target path
 
   // Scroll reset on route change
@@ -27,9 +27,11 @@ export default function Layout() {
   }
 
   const confirm = () => {
-    releaseControl()
+    const path = pending
+    const interrupted = releaseControl()
     setPending(null)
-    if (pending) navigate(pending)
+    if (interrupted) showAppToast('采集已中断，本次数据未保存')
+    if (path) navigate(path)
   }
 
   return (
@@ -53,6 +55,16 @@ export default function Layout() {
           onCancel={() => setPending(null)}
           onConfirm={confirm}
         />
+      )}
+      {appToast && (
+        <div className="fixed bottom-6 right-6 z-[100] pointer-events-none">
+          <div
+            key={appToast.id}
+            className="px-4 py-3 rounded-xl bg-card border border-border shadow-lg text-sm text-foreground animate-in fade-in slide-in-from-bottom-2"
+          >
+            {appToast.msg}
+          </div>
+        </div>
       )}
     </div>
   )

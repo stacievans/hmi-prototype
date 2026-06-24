@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../state/AppContext.jsx'
+import { CollectProgressInline } from '../components/CollectProgressBar.jsx'
 import {
   ArrowLeft, Play, LoaderCircle, ChevronDown, ChevronRight,
   Hand, Glasses, Check, TriangleAlert, Video, Maximize2, Eye, EyeOff, Circle, HardDrive,
@@ -9,6 +10,49 @@ import GripperTimeDock from '../components/charts/GripperTimeDock.jsx'
 
 const MIN_DURATION = 3
 const MAX_DURATION = 300   // 5 minutes
+
+const QC_TOAST_STYLE = {
+  passed: {
+    color: '#3fb950',
+    backgroundColor: 'rgba(63, 185, 80, 0.12)',
+    border: '1px solid rgba(63, 185, 80, 0.35)',
+  },
+  failed: {
+    color: '#f85149',
+    backgroundColor: 'rgba(248, 81, 73, 0.12)',
+    border: '1px solid rgba(248, 81, 73, 0.35)',
+  },
+  warning: {
+    color: '#d29922',
+    backgroundColor: 'rgba(210, 153, 34, 0.12)',
+    border: '1px solid rgba(210, 153, 34, 0.35)',
+  },
+}
+
+const QC_TOAST_LABELS = { passed: '合格', failed: '异常', warning: '警告' }
+
+function pickMockQcOutcome() {
+  const r = Math.random() * 100
+  if (r < 68) return 'passed'
+  if (r < 84) return 'warning'
+  return 'failed'
+}
+
+function mockQcPatch(status) {
+  if (status === 'passed') return { qualityStatus: 'passed' }
+  if (status === 'warning') {
+    return {
+      qualityStatus: 'warning',
+      anomalyType: '警告类',
+      anomalyReasons: ['关节超限位时间段及占比'],
+    }
+  }
+  return {
+    qualityStatus: 'failed',
+    anomalyType: '时序异常',
+    anomalyReasons: ['数据断帧：存在采集卡顿/丢帧'],
+  }
+}
 
 const CAMS = [
   { id: 'head',  label: '头部相机' },
@@ -25,7 +69,8 @@ export default function WorkstationPage() {
     takeControl, releaseControl, setRecordingState, recordingState,
     exportRecordingCSV, setTasks, storage,
     connectedDevices, easingProgress,
-    beginLiveRecordingDisplay, finishRecordingDisplay,
+    beginLiveRecordingDisplay, finishRecordingDisplay, abortRecordingSession,
+    showAppToast,
   } = useApp()
   const task = tasks.find((t) => t.id === taskId)
 
@@ -35,18 +80,77 @@ export default function WorkstationPage() {
   const [countdown, setCountdown] = useState(3)
   const [showWarnShort, setShowWarnShort] = useState(false)
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [pendingLeavePath, setPendingLeavePath] = useState(null)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [cancelCountdown, setCancelCountdown] = useState(3)
   const [showWarnLong, setShowWarnLong] = useState(false)
   const [showNeedControl, setShowNeedControl] = useState(false)
+  const [showWaitingAlign, setShowWaitingAlign] = useState(false)
   const [toast, setToast] = useState(null)
+  const [qcToasts, setQcToasts] = useState([])
   const [showTaskDetails, setShowTaskDetails] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
   const [enabledCams, setEnabledCams] = useState({ head: true, chest: true, left: true, right: true })
   const [fullscreenCam, setFullscreenCam] = useState(null)
-  const [pendingLeavePath, setPendingLeavePath] = useState(null)
+  const qcScheduledRef = useRef(new Set())
+  const prevQualityRef = useRef(new Map())
+  const qcInitRef = useRef(false)
 
-  // Tick recording time
+  const enqueueQcToast = useCallback((index, status) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    setQcToasts((prev) => [...prev, { id, index, status }])
+    setTimeout(() => {
+      setQcToasts((prev) => prev.filter((t) => t.id !== id))
+    }, 3000)
+  }, [])
+
+  const scheduleMockQc = useCallback((itemId) => {
+    if (qcScheduledRef.current.has(itemId)) return
+    qcScheduledRef.current.add(itemId)
+    const delay = 2200 + Math.random() * 2800
+    window.setTimeout(() => {
+      const outcome = pickMockQcOutcome()
+      setTasks((all) => all.map((tk) => {
+        if (tk.id !== taskId) return tk
+        return {
+          ...tk,
+          items: tk.items.map((it) => (
+            it.id === itemId ? { ...it, ...mockQcPatch(outcome) } : it
+          )),
+        }
+      }))
+    }, delay)
+  }, [setTasks, taskId])
+
+  useEffect(() => {
+    qcInitRef.current = false
+    qcScheduledRef.current = new Set()
+    prevQualityRef.current = new Map()
+  }, [taskId])
+
+  useEffect(() => {
+    if (!task) return
+
+    if (!qcInitRef.current) {
+      for (const it of task.items ?? []) {
+        prevQualityRef.current.set(it.id, it.qualityStatus ?? 'pending')
+      }
+      qcInitRef.current = true
+    }
+
+    for (const it of task.items ?? []) {
+      const prev = prevQualityRef.current.get(it.id)
+      const curr = it.qualityStatus ?? 'pending'
+      if (prev === 'pending' && curr !== 'pending' && prev !== undefined) {
+        enqueueQcToast(it.index, curr)
+      }
+      prevQualityRef.current.set(it.id, curr)
+
+      if (curr === 'pending' && it.collectStatus === 'done') {
+        scheduleMockQc(it.id)
+      }
+    }
+  }, [task, enqueueQcToast, scheduleMockQc])
   useEffect(() => {
     if (recordingState === 'recording') {
       timer.current = setInterval(() => {
@@ -147,27 +251,45 @@ export default function WorkstationPage() {
         ],
       }))
       flashToast(`已保存 ${fileName} · ${sampleCount} 帧 (${(sampleCount / 30).toFixed(1)}s)`)
+      finishRecordingDisplay()
     } else if (cancelled) {
+      abortRecordingSession()
       flashToast('已取消本次录制')
+    } else {
+      abortRecordingSession()
     }
-    finishRecordingDisplay()
     setElapsed(0)
     setShowWarnShort(false)
     setShowWarnLong(false)
     setCurrentStep(0)
   }
 
+  const resetLocalRecordingUi = () => {
+    setElapsed(0)
+    setCurrentStep(0)
+    setShowWarnShort(false)
+    setShowWarnLong(false)
+    setShowCancelConfirm(false)
+    setShowCountdown(false)
+    setCancelCountdown(3)
+  }
+
+  const handleReleaseControl = () => {
+    const interrupted = releaseControl()
+    if (interrupted) {
+      resetLocalRecordingUi()
+      flashToast('采集已中断，本次数据未保存')
+    }
+  }
+
   const handleRecordClick = () => {
     if (recordingState === 'recording') { stopRecord(); return }
-    // 必须先完成遥操控制才能采集
     if (controlState !== 'controlling') {
       setShowNeedControl(true)
       return
     }
-    // 已开启控制但 exoskeleton 还在缓动对齐时，给 3s 倒计时
     if (inputSource === 'exoskeleton' && teleopMode !== 'follow') {
-      setShowCountdown(true)
-      setCountdown(3)
+      setShowWaitingAlign(true)
       return
     }
     startRecord()
@@ -187,8 +309,11 @@ export default function WorkstationPage() {
   }
 
   const confirmLeave = () => {
-    releaseControl()
-    setRecordingState('idle')
+    const interrupted = releaseControl()
+    if (interrupted) {
+      resetLocalRecordingUi()
+      showAppToast('采集已中断，本次数据未保存')
+    }
     setShowLeaveConfirm(false)
     nav(pendingLeavePath ?? `/collection/task/${taskId}`)
     setPendingLeavePath(null)
@@ -204,40 +329,64 @@ export default function WorkstationPage() {
     setTimeout(() => setToast(null), 2400)
   }
 
+  useEffect(() => {
+    if (!showWaitingAlign) return
+    if (inputSource === 'exoskeleton' && teleopMode === 'follow') {
+      setShowWaitingAlign(false)
+      flashToast('随动就绪，可以开始采集')
+    }
+  }, [showWaitingAlign, teleopMode, inputSource])
+
   if (!task) return <div className="flex-1 flex items-center justify-center text-muted-foreground">任务未找到</div>
+
+  const canStartRecord = controlState === 'controlling'
+    && (inputSource === 'vr' || teleopMode === 'follow')
+  const exoskeletonAligning = inputSource === 'exoskeleton'
+    && controlState === 'controlling'
+    && teleopMode !== 'follow'
 
   const cd = connectedDevices
   const sources = [
     { key: 'exoskeleton', label: '外骨骼', connected: cd.exoskeleton, Icon: Hand },
     { key: 'vr', label: 'VR', connected: cd.vr, Icon: Glasses },
   ]
-  const ep = task.completedItems + 1
-  const epPct = Math.min(100, (task.completedItems / task.totalItems) * 100)
   const enabledList = CAMS.filter((c) => enabledCams[c.id])
   const fsCam = fullscreenCam ? CAMS.find((c) => c.id === fullscreenCam) : null
 
   return (
     <div className={`flex flex-col h-full overflow-hidden ${recordingState === 'recording' ? 'ring-4 ring-inset ring-destructive/60' : ''}`}>
       <div className="flex-1 flex flex-col p-3 gap-3 min-h-0">
-        {/* Header strip */}
-        <div className="flex items-center justify-between shrink-0 px-1">
-          <button
-            onClick={handleBack}
-            className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors rounded-md px-2.5 py-1 -ml-2 hover:bg-secondary"
-          >
-            <ArrowLeft size={16} />
-            返回
-          </button>
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {/* Header strip: 返回+存储 | 采集进度 | 任务名 */}
+        <div className="flex items-center shrink-0 px-1 min-w-0 gap-4 sm:gap-6">
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleBack}
+              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm transition-colors rounded-md px-2.5 py-1 -ml-2 hover:bg-secondary shrink-0"
+            >
+              <ArrowLeft size={16} />
+              返回
+            </button>
             <StorageStatusBadge storage={storage} onNavigate={() => requestLeave('/anomaly')} />
+          </div>
+
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <CollectProgressInline task={task} showLabel />
             {recordingState === 'recording' && (
               <div className="flex items-center gap-1.5 text-destructive text-xs font-medium shrink-0">
                 <span className="w-2 h-2 rounded-full bg-destructive animate-pulse-dot" />
                 REC
               </div>
             )}
-            <span className="text-sm font-medium truncate max-w-[12rem] sm:max-w-none">{task.name}</span>
-            <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{task.taskId}</span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 min-w-0 max-w-[40%] lg:max-w-none pl-2 sm:pl-4">
+            <span className="text-sm font-medium truncate">{task.name}</span>
+            <span
+              className="text-[10px] text-muted-foreground shrink-0 hidden md:inline truncate max-w-[6.5rem] lg:max-w-[9rem] xl:max-w-none"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              {task.taskId}
+            </span>
           </div>
         </div>
 
@@ -300,24 +449,8 @@ export default function WorkstationPage() {
             </div>
           </div>
 
-          {/* Right column: progress / task details / collection timer / input source / teleop */}
+          {/* Right column: task details / collection timer / input source / teleop */}
           <div className="col-span-1 min-h-0 rounded-md border border-border bg-[#0d1117] flex flex-col overflow-hidden">
-            {/* Current progress */}
-            <div className="p-3 border-b border-border shrink-0">
-              <h4 className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider">当前进度</h4>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl text-primary" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{ep.toString().padStart(2, '0')}</span>
-                <span className="text-xs text-muted-foreground">/ {task.totalItems}</span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-secondary overflow-hidden mt-2">
-                <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${epPct}%` }} />
-              </div>
-              <div className="flex justify-between text-[10px] text-muted-foreground mt-1.5">
-                <span>EP {ep.toString().padStart(4, '0')}</span>
-                <span>{epPct.toFixed(0)}%</span>
-              </div>
-            </div>
-
             {/* Task details (collapsible) */}
             <div className="border-b border-border flex-1 min-h-0 flex flex-col overflow-hidden">
               <button
@@ -370,9 +503,15 @@ export default function WorkstationPage() {
                 <>
                   <button
                     onClick={handleRecordClick}
-                    disabled={controlState !== 'controlling'}
+                    disabled={!canStartRecord}
                     className="w-full py-3 rounded-2xl bg-destructive text-white hover:bg-destructive/90 transition-colors active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-destructive flex items-center justify-center gap-2 text-sm font-medium shadow-md"
-                    title={controlState !== 'controlling' ? '请先开启遥操控制' : ''}
+                    title={
+                      controlState !== 'controlling'
+                        ? '请先开启遥操控制'
+                        : exoskeletonAligning
+                          ? '请等待缓动对齐完成'
+                          : ''
+                    }
                   >
                     <Circle size={11} className="fill-white" strokeWidth={0} />
                     开始采集 (R)
@@ -383,18 +522,24 @@ export default function WorkstationPage() {
                       请先开启遥操控制
                     </div>
                   )}
+                  {exoskeletonAligning && (
+                    <div className="text-[10px] text-warning text-center mt-2 flex items-center justify-center gap-1">
+                      <TriangleAlert size={10} />
+                      缓动对齐中 ({Math.round(easingProgress)}%)，请等待随动就绪
+                    </div>
+                  )}
                 </>
               ) : (
-                <div className="space-y-2">
+                <div className="flex gap-2">
                   <button
                     onClick={stopRecord}
-                    className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium shadow-sm"
+                    className="flex-1 min-w-0 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium shadow-sm"
                   >
                     结束采集 (S)
                   </button>
                   <button
                     onClick={() => setShowCancelConfirm(true)}
-                    className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium border border-border"
+                    className="flex-1 min-w-0 py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] flex items-center justify-center gap-1.5 text-xs font-medium border border-border"
                   >
                     取消采集 (Esc)
                   </button>
@@ -460,7 +605,7 @@ export default function WorkstationPage() {
                       </>
                     )}
                     <button
-                      onClick={releaseControl}
+                      onClick={handleReleaseControl}
                       className="w-full py-2.5 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-xs font-medium border border-border"
                     >
                       退出控制
@@ -611,11 +756,58 @@ export default function WorkstationPage() {
         </div>
       )}
 
+      {/* Exoskeleton alignment in progress — block recording until follow */}
+      {showWaitingAlign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-card border border-border rounded-md p-6 max-w-sm w-full mx-4 shadow-2xl card-depth">
+            <div className="flex items-center gap-2.5 mb-3 text-warning">
+              <LoaderCircle size={20} className="animate-spin" />
+              <h3>缓动对齐中</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              外骨骼正在缓动对齐，需进入随动状态后才能开始采集。请等待对齐完成。
+            </p>
+            <div className="mb-6">
+              <div className="flex items-center justify-between text-[11px] mb-1.5">
+                <span className="text-muted-foreground">对齐进度</span>
+                <span className="text-warning tabular-nums">{Math.round(easingProgress)}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
+                <div
+                  className="h-full bg-warning rounded-full transition-all"
+                  style={{ width: `${easingProgress}%` }}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2.5 justify-end">
+              <button
+                onClick={() => setShowWaitingAlign(false)}
+                className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
+              >
+                我知道了
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-md bg-card border border-border text-sm shadow-2xl card-depth">
           {toast.msg}
         </div>
       )}
+
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col-reverse items-end gap-2 pointer-events-none">
+        {qcToasts.map((t) => (
+          <div
+            key={t.id}
+            className="px-3.5 py-2 rounded-lg text-sm font-medium shadow-2xl card-depth pointer-events-none"
+            style={QC_TOAST_STYLE[t.status] ?? QC_TOAST_STYLE.passed}
+          >
+            第{t.index}条：{QC_TOAST_LABELS[t.status] ?? t.status}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
