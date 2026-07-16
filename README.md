@@ -161,6 +161,7 @@ Layout（壳层）
 - 录制缓冲、曲线快照、中断清理与本地回放
 - **全局本地存储统计**（与设备页、异常页、工作站联动）
 - **全局 Toast**（`appToast` / `showAppToast`）
+- **录制暂停标志**（`paused` / `setPaused`）
 
 通过 `useApp()` Hook 在组件中消费状态。工具函数 `parseDataSizeMB()` 可从 `dataSize` 字符串解析 MB 数值，供异常页等复用。
 
@@ -175,7 +176,7 @@ Layout（壳层）
 | 输入源 | `inputSource` | `null` / `exoskeleton` / `vr` |
 | 遥操 | `controlState`, `teleopMode`, `easingProgress` | idle/controlling；idle/easing/follow |
 | 录制 | `recordingState`, `recordingDisplayState` | idle/recording/replaying；hidden/live/frozen |
-| 实时数据 | `liveData`, `history`, `frozenHistory`, `paused` | 当前快照 + 10s 滚动历史 + 结束采集快照 |
+| 实时数据 | `liveData`, `history`, `frozenHistory`, `paused` | 当前快照 + 10s 滚动历史 + 结束采集快照；`paused` 控制 tick |
 | 任务 | `tasks`, `setTasks` | 采集任务及条目列表 |
 | 用户 | `isLoggedIn`, `userName` | 云平台登录（Mock） |
 | 全局提示 | `appToast`, `showAppToast` | 跨页面 Toast |
@@ -238,15 +239,17 @@ idle ──takeControl()──► controlling + teleopMode: easing
 
 `initialSample(tSec)` 使用正弦波 + 噪声生成关节角与力数据；夹爪开合通过方波模拟。
 
+30 Hz tick 在 `paused === true` 时**整段跳过**（不更新 `liveData` / `history`，不向 `recordingBuffer` 写入）。工作站「录制时长过短」弹窗依赖此机制暂停底层采集。
+
 ### 录制、曲线显示与回放
 
 | API / 状态 | 说明 |
 |------------|------|
-| `beginLiveRecordingDisplay()` | 开始采集前：清空 `frozenHistory`，`recordingDisplayState → live`，恢复仿真 |
+| `beginLiveRecordingDisplay()` | 开始采集前：清空 `frozenHistory`，`recordingDisplayState → live`，`paused → false` |
 | `finishRecordingDisplay()` | 正常结束采集：将 `recordingBuffer` 快照写入 `frozenHistory`，`recordingState → idle`，`recordingDisplayState → frozen`，`paused → true` |
-| `abortRecordingSession()` | 取消/中断采集：清空 buffer 与 frozen 历史，`recordingState → idle`，`recordingDisplayState → hidden`，`paused → false`（**不冻结未保存曲线**） |
+| `abortRecordingSession()` | 取消/中断采集：清空 buffer 与 frozen 历史，`recordingState → idle`，`recordingDisplayState → hidden`，`paused → false` |
 | `releaseControl()` | 释放控制；若正在录制则内联调用中断清理逻辑，返回 `wasRecording` |
-| `recordingBuffer` | ref，录制期间 30 Hz 写入，避免高频 setState |
+| `recordingBuffer` | ref，录制期间 30 Hz 写入（`paused` 时不写入） |
 | `exportRecordingCSV()` | 将缓冲导出为 CSV |
 | `startReplay()` / `stopReplay()` | 本地回放（`recordingState === 'replaying'`） |
 
@@ -303,12 +306,25 @@ CollectionPage 登录云平台
 
 #### TaskDetailPage（任务详情）
 
-- 顶栏下方 **CollectProgressBar**：已落盘段按质检状态分段着色，图例展示各状态条数
-- 文件列表：压缩状态、上传状态、**质检状态**列
-- 质检筛选：全部 / 合格 / 异常 / 警告 / 待检
+**顶栏操作区**
+
+| 按钮 | 样式 | 说明 |
+|------|------|------|
+| **继续采集 / 开始采集** | 深蓝实心主按钮 `CollectPrimaryButton` | 进入采集工作站的**主入口**，置右突出 |
+| 批量压缩 / 批量上传 / 提交任务 / 打开工作站 | 线框次要按钮 `OUTLINE_BTN` | 灰色底 + 边框 |
+
+「继续采集 / 开始采集」点击后弹出「打开工作站」确认框，确认后跳转 `/collection/workstation/:taskId`。
+
+**CollectProgressBar**：已落盘段按质检状态分段着色，图例展示各状态条数。
+
+**文件列表**
+
+- 按 `index` **升序**排列（新采集条目追加到 `items` 末尾，`index = max(index)+1`）
+- `#` 列固定 **48px**，各列**居中对齐**；文件名列占据剩余宽度
+- 列：序号、文件名、采集时间、大小、时长、压缩、质检状态、上传
+- 筛选栏左侧显示「共 N 条」；支持压缩 / 上传 / 质检三维筛选与分页
 - 点击异常/警告徽章打开右侧质检详情抽屉（原因、异常类型）
 - **批量压缩 / 批量上传** 仅处理 `passed` 与 `warning`，排除 `failed` 与 `pending`
-- 上传完成 toast 会提示未上传条数（异常/待检）
 - 列表为只读，不支持行内删除
 
 #### WorkstationPage（采集工作站）
@@ -330,7 +346,7 @@ CollectionPage 登录云平台
 └─────────────────────────┴──────────────────────────────┘
 ```
 
-**采集准入条件**：
+**采集准入条件**
 
 | 输入源 | 条件 |
 |--------|------|
@@ -339,37 +355,80 @@ CollectionPage 登录云平台
 
 外骨骼缓动对齐期间：
 
-- 「开始采集」按钮置灰，下方提示 `缓动对齐中 (XX%)，请等待随动就绪`
-- 快捷键 `R` 或强行触发 → 弹出「缓动对齐中」弹窗（含实时进度条）
-- 对齐完成且弹窗仍打开时 → 自动关闭并 toast「随动就绪，可以开始采集」
+- 「开始采集」按钮置灰，提示 `缓动对齐中 (XX%)，请等待随动就绪`
+- 快捷键 `R` → 弹出「缓动对齐中」弹窗（含实时进度条）
+- 对齐完成且弹窗仍打开 → 自动关闭并 toast「随动就绪，可以开始采集」
+- **随动就绪后直接 `startRecord()`**，无开录前倒计时
 
-**录制控制**：
+**快捷键与按钮统一入口**
+
+| 键 | 行为 | 实现要点 |
+|----|------|----------|
+| `R` | 开始 / 结束采集 | 经 `handleRecordClickRef` 调用，与按钮同源 |
+| `S` | 结束采集 | 经 `stopRecordRef` 调用，与按钮同源 |
+| `Esc` | 取消采集确认 | 弹出「确认取消录制」 |
+
+键盘监听通过 **ref 转发**（`elapsedRef`、`stopRecordRef`、`handleRecordClickRef`）避免闭包过期，保证与按钮使用同一套实时判断。
+
+**录制控制**
 
 | 操作 | 行为 |
 |------|------|
-| 开始采集 (R) | `beginLiveRecordingDisplay()` + `recordingState → recording`，计时从 0 开始 |
-| 结束采集 (S) | 时长 ≥ 3s 则保存条目；< 3s 弹窗建议丢弃或继续 |
-| 取消采集 (Esc) | 3 秒倒计时确认 → `abortRecordingSession()`，toast「已取消本次录制」 |
-| 最长时长 | 5 分钟，超时前 30s 警告，5s 后自动结束并保存 |
+| 开始采集 (R) | `beginLiveRecordingDisplay()` + `recordingState → recording`，`elapsed` 从 0 开始 |
+| 结束采集 (S) | 见下方「录制时长过短」弹窗 |
+| 取消采集 (Esc) | 见下方「确认取消录制」弹窗 |
+| 最长时长 | 5 分钟；超时前 30s 警告，5s 后自动 `doStop()` 保存 |
 | 退出控制 | 录制中 → 采集中断（不保存）；非录制 → 仅释放控制 |
 
-保存成功时：根据 CSV 帧数估算 `dataSize`，写入任务 `items`（`qualityStatus: 'pending'`），`completedItems + 1`，随后 `finishRecordingDisplay()` 冻结曲线。
+**弹窗：录制时长过短**（`elapsed < 3s` 时结束采集）
 
-**Mock 质检 Toast**（仅工作站）：
+触发：`stopRecord()` 判断 `elapsedRef.current < MIN_DURATION`（含 0～2 秒）。
+
+| 维度 | 弹窗期间行为 |
+|------|-------------|
+| 页面计时 `elapsed` | **停止**（`showWarnShort` 时 clearInterval） |
+| 曲线 / `liveData` / `history` | **停止更新**（`setPaused(true)`，AppContext tick 跳过） |
+| `recordingBuffer` 写入 | **停止**（同上，`push` 在 `paused`  guard 之后） |
+| `recordingState` | 仍为 `'recording'`（会话未结束） |
+
+用户选择：
+
+- **继续录制** → `setPaused(false)`，计时与 buffer 恢复
+- **丢弃** → `doStop(true)` → `abortRecordingSession()`
+
+**弹窗：确认取消录制**（Esc / 「取消采集」）
+
+触发：仅 `setShowCancelConfirm(true)`，**不**调用 `setPaused`。
+
+| 维度 | 弹窗期间行为 |
+|------|-------------|
+| 页面计时 `elapsed` | **继续递增** |
+| 曲线 / buffer | **继续写入**（`paused` 仍为 `false`） |
+
+用户选择：
+
+- **继续录制** → 关闭弹窗，重置 3s 倒计时
+- **确认取消 / 倒计时结束** → `doStop(true)` 清空 buffer
+
+> 两个弹窗的暂停策略** intentionally 不一致**：「过短」暂停底层采集；「取消确认」目前仅为 UI 拦截，后台录制不暂停（倒计时期间 buffer 会继续增长，取消后整段丢弃）。
+
+保存成功时：根据 CSV 帧数估算 `dataSize`，新条目**追加**到 `items` 末尾（`index = max(index)+1`），`qualityStatus: 'pending'`，`completedItems + 1`，随后 `finishRecordingDisplay()` 冻结曲线。
+
+**Mock 质检 Toast**（仅工作站）
 
 - 新条目落盘后 2.2~5s 内随机完成 Mock 质检（约 68% 合格 / 16% 警告 / 16% 异常）
 - 质检从 `pending` 变为终态时，右下角堆叠 Toast：`第N条：合格/警告/异常`
 
-**其他**：
+**其他**
 
 - 4 路相机网格 + 开关 + 全屏（内联 `CameraTile`，非 `CameraGrid`）
-- 录制中步骤描述高亮当前步骤；页面外圈红色 REC 描边
-- 顶部存储角标：读取全局 `storage.usagePct`，≥ 80% 可点击（带离开确认）
+- 录制中步骤描述高亮；页面外圈红色 REC 描边
+- 顶部存储角标：≥ 80% 可点击跳转异常页（带离开确认）
 
 #### AnomalyDataPage（异常数据管理）
 
 - 跨任务聚合所有 `qualityStatus === 'failed'` 条目
-- **概览区**（`grid-cols-4`）：异常总条数（25%）、总占用空间（25%）、**异常类型分布**（50%，分段色条 + 图例，风格与设备页存储条一致）
+- **概览区**（`grid-cols-4`）：异常总条数（25%）、总占用空间（25%）、**异常类型分布**（50%，分段色条 + 图例）
 - 类型配色：文件异常 `#79c0ff`、数据缺失 `#a371f7`、时序异常 `#56d4dd`、传感器异常 `#db6d9c`
 - 表格：任务、采集时间、大小（GB 两位小数）、异常类型、原因摘要、本地路径复制
 - 筛选：任务、异常类型；分页 + 跨页全选
@@ -427,7 +486,7 @@ CollectionPage 登录云平台
 
 ```javascript
 {
-  id, index,
+  id, index,          // index 为采集序号，列表按 index 升序展示
   fileName,           // YYYYMMDD_HHMMSS.h5
   dataSize,           // 如 "5200 MB"
   duration, collectTime,
@@ -462,7 +521,9 @@ CollectionPage 登录云平台
 - **圆角**：输入框 6px、按钮 6px、卡片 10px
 - **交互**：按钮点击缩放反馈、`card-depth` 内阴影、`prefers-reduced-motion` 适配
 
-> 注意：全局 `button { background: none; color: inherit }` 会覆盖 Tailwind 按钮背景类。告警态控件（如工作站存储角标、质检 Chip）使用**内联样式**确保颜色生效。
+> 注意：全局 `button { background: none; color: inherit }` 会覆盖 Tailwind 按钮背景类。主操作按钮（如任务详情「继续采集」）、告警态控件（存储角标、质检 Chip）使用**内联样式**确保颜色生效。
+
+任务详情主按钮配色：`#1a4f8c`（默认）→ `#2563b8`（悬停）→ `#0f3a6e`（按下）。
 
 ## 演示建议
 
@@ -475,22 +536,27 @@ CollectionPage 登录云平台
 
 ### 外骨骼采集完整流程
 
-1. 任务详情 → 进入工作站 → 选择外骨骼 → 开启控制
-2. 观察缓动对齐进度（右栏进度条）；此期间「开始采集」置灰
-3. 随动就绪后点击开始采集 → 观察 REC 状态、曲线 live 更新、步骤高亮
-4. 结束采集（≥ 3s）→ 曲线 frozen → 右下角 Mock 质检 Toast
-5. 返回任务详情 → 顶栏进度条新增 pending 段
+1. 任务详情 → 点击深蓝 **继续采集** → 确认进入工作站
+2. 选择外骨骼 → 开启控制 → 观察缓动对齐（此期间「开始采集」置灰）
+3. 随动就绪后开始采集 → REC 描边、曲线 live、步骤高亮
+4. 结束采集（≥ 3s）→ 曲线 frozen → Mock 质检 Toast
+5. 返回任务详情 → 列表按序号递增排列，进度条新增 pending 段
+
+### 录制弹窗与暂停行为
+
+1. **过短弹窗**：开录后 1～2 秒内按 **S 或按钮** 结束 → 应稳定弹出；弹窗期间计时与曲线停住 → 选「继续录制」恢复
+2. **取消确认**：按 **Esc** → 弹窗 3s 倒计时；此期间计时与曲线**仍在走** → 确认取消后 buffer 清空
 
 ### 采集中断与离开确认
 
 1. 录制中点击「退出控制」→ toast「采集已中断，本次数据未保存」，进度不增加
-2. 录制中点侧栏「设备」→ 离开确认 → 确认后全局 toast + 跳转，条目未增加
+2. 录制中点侧栏其他页 → 离开确认 → 全局 toast + 跳转，条目未增加
 3. 录制中点顶栏「返回」→ 工作站内联确认，行为与侧栏一致
 
 ### 曲线冻结
 
-1. 结束采集后左列 `GripperTimeDock` 进入 `frozen` 阶段
-2. 拖动时间轴回看最后一帧快照；仿真 tick 已停止，曲线不再变动
+1. 正常结束采集后 `GripperTimeDock` 进入 `frozen` 阶段
+2. 拖动时间轴回看；仿真 tick 已停止，曲线不再变动
 
 ## 已知局限
 
@@ -500,7 +566,9 @@ CollectionPage 登录云平台
 - **遗留组件**：`CurvesPanel` 尚未接入任何页面
 - **待修复**：`CameraGrid.jsx` 全屏退出按钮引用了未定义的 `onExitFullscreen`（`/teleop` 使用；工作站相机为内联实现，不受影响）
 - **浏览器导航拦截**：未拦截后退/刷新/关闭标签页
-- **工作站新录制条目**：通过 CSV 帧数估算 `dataSize`；Mock 质检仅在工作站页触发，任务详情页不重复调度
+- **取消确认弹窗不暂停采集**：Esc 确认期间 buffer 仍写入，与「过短」弹窗行为不一致（见上文说明）
+- **暂停恢复时间戳空档**：「过短」弹窗 `paused` 期间 wall clock 继续走，恢复后 buffer 时间轴可能出现间隙
+- **工作站新录制条目**：通过 CSV 帧数估算 `dataSize`；Mock 质检仅在工作站页触发
 
 ## 版本信息
 

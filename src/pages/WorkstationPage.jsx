@@ -70,14 +70,14 @@ export default function WorkstationPage() {
     exportRecordingCSV, setTasks, storage,
     connectedDevices, easingProgress,
     beginLiveRecordingDisplay, finishRecordingDisplay, abortRecordingSession,
-    showAppToast,
+    showAppToast, setPaused,
   } = useApp()
   const task = tasks.find((t) => t.id === taskId)
 
   const [elapsed, setElapsed] = useState(0)
+  const elapsedRef = useRef(0)
+  elapsedRef.current = elapsed
   const timer = useRef(null)
-  const [showCountdown, setShowCountdown] = useState(false)
-  const [countdown, setCountdown] = useState(3)
   const [showWarnShort, setShowWarnShort] = useState(false)
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [pendingLeavePath, setPendingLeavePath] = useState(null)
@@ -95,6 +95,10 @@ export default function WorkstationPage() {
   const qcScheduledRef = useRef(new Set())
   const prevQualityRef = useRef(new Map())
   const qcInitRef = useRef(false)
+  const recordingStateRef = useRef(recordingState)
+  recordingStateRef.current = recordingState
+  const handleRecordClickRef = useRef(() => {})
+  const stopRecordRef = useRef(() => {})
 
   const enqueueQcToast = useCallback((index, status) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -152,19 +156,21 @@ export default function WorkstationPage() {
     }
   }, [task, enqueueQcToast, scheduleMockQc])
   useEffect(() => {
-    if (recordingState === 'recording') {
-      timer.current = setInterval(() => {
-        setElapsed((e) => {
-          const next = e + 1
-          if (next >= MAX_DURATION) {
-            setShowWarnLong(true)
-          }
-          return next
-        })
-      }, 1000)
+    if (recordingState !== 'recording' || showWarnShort) {
+      clearInterval(timer.current)
+      return
     }
+    timer.current = setInterval(() => {
+      setElapsed((e) => {
+        const next = e + 1
+        if (next >= MAX_DURATION) {
+          setShowWarnLong(true)
+        }
+        return next
+      })
+    }, 1000)
     return () => clearInterval(timer.current)
-  }, [recordingState])
+  }, [recordingState, showWarnShort])
 
   // Long duration warning: auto-stop after 5s
   useEffect(() => {
@@ -172,19 +178,6 @@ export default function WorkstationPage() {
     const t = setTimeout(() => doStop(), 5000)
     return () => clearTimeout(t)
   }, [showWarnLong])
-
-  // Countdown effect (before recording)
-  useEffect(() => {
-    if (!showCountdown) return
-    if (countdown === 0) {
-      setShowCountdown(false)
-      setCountdown(3)
-      startRecord()
-      return
-    }
-    const t = setTimeout(() => setCountdown((c) => c - 1), 1000)
-    return () => clearTimeout(t)
-  }, [showCountdown, countdown])
 
   // Cancel confirmation 3s auto-confirm
   useEffect(() => {
@@ -199,39 +192,21 @@ export default function WorkstationPage() {
     return () => clearTimeout(t)
   }, [showCancelConfirm, cancelCountdown])
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
-      if (e.key === 'r' || e.key === 'R') {
-        if (recordingState !== 'recording') handleRecordClick()
-      } else if (e.key === 's' || e.key === 'S') {
-        if (recordingState === 'recording') stopRecord()
-      } else if (e.key === 'Escape') {
-        if (recordingState === 'recording') setShowCancelConfirm(true)
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [recordingState])
-
   const startRecord = () => {
     beginLiveRecordingDisplay()
     setRecordingState('recording')
     setElapsed(0)
+    elapsedRef.current = 0
+    setPaused(false)
   }
-  const stopRecord = () => {
-    if (elapsed > 0 && elapsed < MIN_DURATION) {
-      setShowWarnShort(true)
-      return
-    }
-    doStop()
-  }
+
   const doStop = (cancelled = false) => {
     const csv = exportRecordingCSV()
     const sampleCount = csv ? csv.split('\n').length - 1 : 0
     if (sampleCount > 0 && !cancelled) {
-      const idx = task.items.length + 1
+      const nextIndex = task.items.length > 0
+        ? Math.max(...task.items.map((it) => it.index ?? 0)) + 1
+        : 1
       const fileName = task.items.length > 0
         ? task.items[0].fileName
         : (() => {
@@ -246,8 +221,8 @@ export default function WorkstationPage() {
         ...tk,
         completedItems: Math.min(tk.totalItems, tk.completedItems + 1),
         items: [
-          { id: `it-${Date.now()}`, index: idx, fileName, dataSize: `${(sampleCount / 30 * 0.6).toFixed(1)} MB`, duration: `${sampleCount / 30 | 0}s`, collectTime, compressStatus: 'pending', qualityStatus: 'pending', uploadStatus: 'pending', collectStatus: 'done' },
           ...tk.items,
+          { id: `it-${Date.now()}`, index: nextIndex, fileName, dataSize: `${(sampleCount / 30 * 0.6).toFixed(1)} MB`, duration: `${sampleCount / 30 | 0}s`, collectTime, compressStatus: 'pending', qualityStatus: 'pending', uploadStatus: 'pending', collectStatus: 'done' },
         ],
       }))
       flashToast(`已保存 ${fileName} · ${sampleCount} 帧 (${(sampleCount / 30).toFixed(1)}s)`)
@@ -259,19 +234,36 @@ export default function WorkstationPage() {
       abortRecordingSession()
     }
     setElapsed(0)
+    elapsedRef.current = 0
     setShowWarnShort(false)
     setShowWarnLong(false)
     setCurrentStep(0)
   }
 
+  const stopRecord = () => {
+    if (showWarnShort) return
+    if (elapsedRef.current < MIN_DURATION) {
+      setShowWarnShort(true)
+      setPaused(true)
+      return
+    }
+    doStop()
+  }
+
+  const resumeAfterShortWarn = () => {
+    setShowWarnShort(false)
+    setPaused(false)
+  }
+
   const resetLocalRecordingUi = () => {
     setElapsed(0)
+    elapsedRef.current = 0
     setCurrentStep(0)
     setShowWarnShort(false)
     setShowWarnLong(false)
     setShowCancelConfirm(false)
-    setShowCountdown(false)
     setCancelCountdown(3)
+    setPaused(false)
   }
 
   const handleReleaseControl = () => {
@@ -294,6 +286,24 @@ export default function WorkstationPage() {
     }
     startRecord()
   }
+
+  handleRecordClickRef.current = handleRecordClick
+  stopRecordRef.current = stopRecord
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (e.key === 'r' || e.key === 'R') {
+        if (recordingStateRef.current !== 'recording') handleRecordClickRef.current()
+      } else if (e.key === 's' || e.key === 'S') {
+        if (recordingStateRef.current === 'recording') stopRecordRef.current()
+      } else if (e.key === 'Escape') {
+        if (recordingStateRef.current === 'recording') setShowCancelConfirm(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const requestLeave = (path) => {
     if (controlState === 'controlling' || recordingState === 'recording') {
@@ -623,17 +633,6 @@ export default function WorkstationPage() {
         </div>
       </div>
 
-      {/* Countdown */}
-      {showCountdown && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-card border border-border rounded-md p-8 text-center shadow-2xl card-depth">
-            <LoaderCircle size={32} className="mx-auto text-primary animate-spin mb-4" />
-            <p className="text-muted-foreground text-sm mb-2">系统接管中</p>
-            <p className="text-6xl text-primary" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{countdown}</p>
-          </div>
-        </div>
-      )}
-
       {/* Short recording warning */}
       {showWarnShort && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
@@ -648,7 +647,7 @@ export default function WorkstationPage() {
                 丢弃
               </button>
               <button
-                onClick={() => setShowWarnShort(false)}
+                onClick={resumeAfterShortWarn}
                 className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
               >
                 继续录制

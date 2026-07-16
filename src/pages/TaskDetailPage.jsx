@@ -71,6 +71,58 @@ const CHIP_BUTTON_HOVER = {
   warning: 'hover:brightness-110 hover:shadow-[inset_0_0_0_1px_rgba(210,153,34,0.45)]',
 }
 
+const OUTLINE_BTN =
+  'flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border'
+
+/** 采集主按钮：深蓝实心 + 悬停/按下反馈；内联样式覆盖全局 button reset，避免文字发糊 */
+function CollectPrimaryButton({ onClick, disabled, children }) {
+  const [hovered, setHovered] = useState(false)
+  const [pressed, setPressed] = useState(false)
+
+  let backgroundColor = '#1a4f8c'
+  if (disabled) {
+    backgroundColor = '#1a4f8c'
+  } else if (pressed) {
+    backgroundColor = '#0f3a6e'
+  } else if (hovered) {
+    backgroundColor = '#2563b8'
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => {
+        setHovered(false)
+        setPressed(false)
+      }}
+      onMouseDown={() => !disabled && setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-sm font-medium border disabled:opacity-45 disabled:cursor-not-allowed transition-[box-shadow,border-color] duration-150"
+      style={{
+        backgroundColor,
+        color: '#ffffff',
+        borderColor: hovered && !disabled ? '#4d8fd9' : '#2a6cb8',
+        boxShadow: disabled
+          ? 'none'
+          : pressed
+            ? 'inset 0 1px 2px rgba(0, 0, 0, 0.35)'
+            : hovered
+              ? '0 2px 10px rgba(26, 79, 140, 0.55)'
+              : '0 1px 3px rgba(0, 0, 0, 0.35)',
+        WebkitFontSmoothing: 'antialiased',
+        MozOsxFontSmoothing: 'grayscale',
+        textShadow: 'none',
+        transform: pressed && !disabled ? 'translateY(1px)' : 'none',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
 /** 批量压缩/上传仅处理 passed、warning，排除 failed 与 pending */
 function isBatchQualityEligible(item) {
   return item.qualityStatus === 'passed' || item.qualityStatus === 'warning'
@@ -290,13 +342,24 @@ export default function TaskDetailPage() {
 
   const filtered = useMemo(() => {
     if (!task) return []
-    return task.items.filter((it) => {
-      if (cFilter !== 'all' && it.compressStatus !== cFilter) return false
-      if (uFilter !== 'all' && it.uploadStatus !== uFilter) return false
-      if (qFilter !== 'all' && it.qualityStatus !== qFilter) return false
-      return true
-    })
+    return task.items
+      .filter((it) => {
+        if (cFilter !== 'all' && it.compressStatus !== cFilter) return false
+        if (uFilter !== 'all' && it.uploadStatus !== uFilter) return false
+        if (qFilter !== 'all' && it.qualityStatus !== qFilter) return false
+        return true
+      })
+      .sort((a, b) => {
+        const ia = a.index ?? 0
+        const ib = b.index ?? 0
+        if (ia !== ib) return ia - ib
+        return (a.collectTime || '').localeCompare(b.collectTime || '')
+      })
   }, [task, cFilter, uFilter, qFilter])
+
+  useEffect(() => {
+    setPage(1)
+  }, [taskId, cFilter, uFilter, qFilter])
 
   if (!task) {
     return <div className="flex-1 flex items-center justify-center text-muted-foreground">任务未找到</div>
@@ -332,85 +395,65 @@ export default function TaskDetailPage() {
             </div>
             {task.status === 'in_progress' ? (
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={startCompress}
-                  disabled={!!progress}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
-                >
+                <button onClick={startCompress} disabled={!!progress} className={OUTLINE_BTN}>
                   <Archive size={14} />
                   批量压缩
                 </button>
-                <button
-                  onClick={startUpload}
-                  disabled={!!progress}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
-                >
+                <button onClick={startUpload} disabled={!!progress} className={OUTLINE_BTN}>
                   <Send size={14} />
                   批量上传
                 </button>
-                <button
-                  onClick={() => setConfirmStart(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] text-sm font-medium"
-                >
-                  <Play size={14} fill="currentColor" />
-                  继续采集
-                </button>
-                <button
-                  onClick={() => setSubmitModal(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success text-white hover:bg-success/90 transition-colors active:scale-[0.98] text-sm font-medium"
-                >
+                <button onClick={() => setSubmitModal(true)} className={OUTLINE_BTN}>
                   <ArchiveRestore size={14} />
                   提交任务
                 </button>
+                <CollectPrimaryButton onClick={() => setConfirmStart(true)}>
+                  <Play size={14} fill="currentColor" />
+                  继续采集
+                </CollectPrimaryButton>
               </div>
             ) : (
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={startCompress}
-                  disabled={!!progress}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
-                >
+                <button onClick={startCompress} disabled={!!progress} className={OUTLINE_BTN}>
                   <Archive size={14} />
                   批量压缩
                 </button>
-                <button
-                  onClick={startUpload}
-                  disabled={!!progress}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] disabled:opacity-50 text-sm font-medium border border-border"
-                >
+                <button onClick={startUpload} disabled={!!progress} className={OUTLINE_BTN}>
                   <Send size={14} />
                   批量上传
                 </button>
                 <button
                   onClick={() => nav(`/collection/workstation/${taskId}`)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 transition-colors active:scale-[0.98] text-sm font-medium border border-border"
+                  className={OUTLINE_BTN}
                 >
                   <MonitorPlay size={14} />
                   打开工作站
                 </button>
                 <button
-                  onClick={() => setConfirmStart(true)}
-                  disabled={task.completedItems >= task.totalItems}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors active:scale-[0.98] disabled:opacity-40 text-sm font-medium"
-                >
-                  <Play size={14} fill="currentColor" />
-                  {task.completedItems > 0 ? '继续采集' : '开始采集'}
-                </button>
-                <button
                   onClick={() => setSubmitModal(true)}
                   disabled={!canSubmit || task.status === 'completed'}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-success text-white hover:bg-success/90 transition-colors active:scale-[0.98] disabled:opacity-40 text-sm font-medium"
+                  className={OUTLINE_BTN}
                 >
                   <ArchiveRestore size={14} />
                   {task.status === 'completed' ? '已提交' : '提交任务'}
                 </button>
+                <CollectPrimaryButton
+                  onClick={() => setConfirmStart(true)}
+                  disabled={task.completedItems >= task.totalItems}
+                >
+                  <Play size={14} fill="currentColor" />
+                  {task.completedItems > 0 ? '继续采集' : '开始采集'}
+                </CollectPrimaryButton>
               </div>
             )}
           </div>
           <CollectProgressBar task={task} />
         </div>
 
-        <div className="px-6 py-3 border-b border-border shrink-0 flex items-center gap-3 justify-end text-xs">
+        <div className="px-6 py-3 border-b border-border shrink-0 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+          <span className="text-muted-foreground mr-auto">
+            共 {filtered.length} 条
+          </span>
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <span>压缩:</span>
             <select
@@ -450,35 +493,46 @@ export default function TaskDetailPage() {
             </div>
           ) : (
             <div className="rounded-xl border border-border overflow-hidden">
-              <table className="w-full text-sm table-fixed">
+              <table className="w-full text-sm table-fixed border-collapse">
+                <colgroup>
+                  <col style={{ width: '48px' }} />
+                  <col />
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '12%' }} />
+                </colgroup>
                 <thead className="bg-secondary/50 text-xs text-muted-foreground">
                   <tr>
-                    <th className="text-left px-2 py-2.5 font-medium w-11">#</th>
-                    <th className="text-left px-3 py-2.5 font-medium min-w-0">文件名</th>
-                    <th className="text-left px-2 py-2.5 font-medium w-[8.5rem]">采集时间</th>
-                    <th className="text-left px-2 py-2.5 font-medium w-[4.5rem]">大小</th>
-                    <th className="text-left px-2 py-2.5 font-medium w-14">时长</th>
-                    <th className="text-left px-2 py-2.5 font-medium w-16 whitespace-nowrap">压缩</th>
-                    <th className="text-center px-2 py-2.5 font-medium w-[5.5rem] whitespace-nowrap">质检状态</th>
-                    <th className="text-left px-2 py-2.5 font-medium w-16 whitespace-nowrap">上传</th>
+                    <th className="w-[48px] max-w-[48px] px-2 py-2.5 font-medium text-center">#</th>
+                    <th className="text-center px-3 py-2.5 font-medium">文件名</th>
+                    <th className="text-center px-2 py-2.5 font-medium whitespace-nowrap">采集时间</th>
+                    <th className="text-center px-2 py-2.5 font-medium whitespace-nowrap">大小</th>
+                    <th className="text-center px-2 py-2.5 font-medium whitespace-nowrap">时长</th>
+                    <th className="text-center px-2 py-2.5 font-medium whitespace-nowrap">压缩</th>
+                    <th className="text-center px-2 py-2.5 font-medium whitespace-nowrap">质检状态</th>
+                    <th className="text-center px-2 py-2.5 font-medium whitespace-nowrap">上传</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((it) => {
+                  {list.map((it, rowIdx) => {
                     const cp = STATUS_BADGE.compress[it.compressStatus] || ['—', 'text-muted-foreground']
                     const us = STATUS_BADGE.upload[it.uploadStatus] || ['—', 'text-muted-foreground']
+                    const rowNum = (page - 1) * pageSize + rowIdx + 1
                     return (
                       <tr key={it.id} className="border-t border-border hover:bg-secondary/30 transition-colors">
-                        <td className="px-2 py-2.5 text-muted-foreground tabular-nums">{it.index}</td>
-                        <td className="px-3 py-2.5 min-w-0 truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }} title={it.fileName}>{it.fileName}</td>
-                        <td className="px-2 py-2.5 text-muted-foreground text-xs whitespace-nowrap">{it.collectTime || '—'}</td>
-                        <td className="px-2 py-2.5 text-muted-foreground text-xs whitespace-nowrap">{it.dataSize || '—'}</td>
-                        <td className="px-2 py-2.5 text-muted-foreground text-xs whitespace-nowrap">{it.duration || '—'}</td>
-                        <td className={`px-2 py-2.5 text-xs whitespace-nowrap ${cp[1]}`}>{cp[0]}</td>
+                        <td className="w-[48px] max-w-[48px] px-2 py-2.5 text-muted-foreground tabular-nums text-center text-xs">{it.index ?? rowNum}</td>
+                        <td className="px-3 py-2.5 min-w-0 truncate text-center" style={{ fontFamily: "'JetBrains Mono', monospace" }} title={it.fileName}>{it.fileName}</td>
+                        <td className="px-2 py-2.5 text-muted-foreground text-xs whitespace-nowrap text-center">{it.collectTime || '—'}</td>
+                        <td className="px-2 py-2.5 text-muted-foreground text-xs whitespace-nowrap text-center">{it.dataSize || '—'}</td>
+                        <td className="px-2 py-2.5 text-muted-foreground text-xs whitespace-nowrap text-center">{it.duration || '—'}</td>
+                        <td className={`px-2 py-2.5 text-xs whitespace-nowrap text-center ${cp[1]}`}>{cp[0]}</td>
                         <td className="px-2 py-2.5 whitespace-nowrap text-center">
                           <QualityBadge item={it} onInspect={setQualityDrawerItem} />
                         </td>
-                        <td className={`px-2 py-2.5 text-xs whitespace-nowrap ${us[1]}`}>{us[0]}</td>
+                        <td className={`px-2 py-2.5 text-xs whitespace-nowrap text-center ${us[1]}`}>{us[0]}</td>
                       </tr>
                     )
                   })}
